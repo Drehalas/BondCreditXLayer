@@ -4,9 +4,13 @@ export type {
   Network,
   SubscriptionStatus,
   CreditScore,
+  AvailableCredit,
   CreditRequest,
   CreditPosition,
   Guarantee,
-  AnalyticsEvent
+  AnalyticsEvent,
+  X402GuaranteeRequest,
+  X402GuaranteeResponse,
+  X402GuaranteeStatus
 } from './lib/types.js';
 

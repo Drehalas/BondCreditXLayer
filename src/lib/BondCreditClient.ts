@@ -13,7 +13,10 @@ export class BondCreditClient {
   constructor(public readonly config: BondCreditClientConfig) {
     this.subscription = new SubscriptionClient(config);
     this.credit = new CreditClient(config);
-    this.x402 = new X402Client(config);
+    this.x402 = new X402Client(config, {
+      subscription: this.subscription,
+      credit: this.credit
+    });
     this.analytics = new AnalyticsClient(config);
   }
 }

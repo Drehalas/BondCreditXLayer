@@ -35,6 +35,12 @@ export type Guarantee = {
   expiresAt: string;
 };
 
+export type AvailableCredit = {
+  value: number; // numeric value in the given currency
+  currency: string;
+  updatedAt: string;
+};
+
 export type CreditRequest = {
   id: string;
   agentId: string;
@@ -56,4 +62,31 @@ export type AnalyticsEvent =
   | { type: 'trade'; timestamp: string; payload: unknown }
   | { type: 'subscription'; timestamp: string; payload: unknown }
   | { type: 'credit'; timestamp: string; payload: unknown };
+
+export type X402GuaranteeRequest = {
+  recipient: string;
+  amount: string;
+  service: string;
+  endpoint: string;
+};
+
+export type X402Payload = {
+  amount: string;
+  recipient: string;
+  guarantor: string;
+};
+
+export type X402GuaranteeResponse = {
+  guaranteeId: string;
+  proof: string;
+  expiresAt: string;
+  x402Payload: X402Payload;
+};
+
+export type X402GuaranteeStatus = {
+  active: boolean;
+  used: boolean;
+  cancelled?: boolean;
+  expiresIn: string;
+};
 
