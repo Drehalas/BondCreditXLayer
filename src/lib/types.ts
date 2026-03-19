@@ -19,7 +19,31 @@ export type SubscriptionStatus = {
   startedAt?: string;
   renewsAt?: string;
   plan?: 'daily';
+  expiryDate?: string;
+  daysLeft?: number;
+  paymentsMade?: number;
 };
+
+export type SubscribeInput = {
+  duration?: string; // e.g. "30 days"
+  autoRenew?: boolean;
+};
+
+export type SubscribeResult = {
+  status: 'active' | 'inactive';
+  expiry: string;
+  txHash: string;
+  amount: string;
+};
+
+export type CheckStatusResult = {
+  active: boolean;
+  expiryDate?: string;
+  daysLeft?: number;
+  paymentsMade?: number;
+};
+
+export type RenewResult = SubscribeResult;
 
 export type CreditScore = {
   value: number; // 0..1000
