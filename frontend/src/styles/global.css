@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Epilogue:wght@300;400;600;700&display=swap');
+
+:root {
+  --bg0: #07080b;
+  --bg1: #0d1020;
+  --card: rgba(18, 22, 40, 0.72);
+  --card2: rgba(18, 22, 40, 0.52);
+  --text: rgba(245, 248, 255, 0.92);
+  --muted: rgba(245, 248, 255, 0.64);
+  --line: rgba(255, 255, 255, 0.12);
+  --line2: rgba(255, 255, 255, 0.18);
+  --accent: #3bf7d2;
+  --accent2: #7aa7ff;
+  --danger: #ff4d6d;
+  --shadow: rgba(0, 0, 0, 0.55);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Epilogue', system-ui, sans-serif;
+  color: var(--text);
+  background: radial-gradient(1200px 800px at 18% 10%, rgba(122, 167, 255, 0.24), transparent 55%),
+    radial-gradient(1000px 700px at 78% 12%, rgba(59, 247, 210, 0.18), transparent 52%),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
+  overflow-x: hidden;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+input:focus,
+select:focus {
+  border-color: rgba(59, 247, 210, 0.5);
+}
+
+button {
+  font-family: inherit;
+}
+

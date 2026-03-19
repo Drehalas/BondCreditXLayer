@@ -1,0 +1,253 @@
+.bc-root {
+  position: relative;
+  min-height: 100vh;
+}
+
+.bc-noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: 0.45;
+}
+
+.bc-header {
+  padding: 28px clamp(16px, 4vw, 44px);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 18px;
+}
+
+.bc-wordmark {
+  line-height: 0.92;
+}
+
+.bc-wordmarkTop,
+.bc-wordmarkBottom {
+  font-family: 'Orbitron', system-ui, sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: clamp(28px, 4vw, 54px);
+  position: relative;
+}
+
+.bc-wordmarkTop {
+  color: rgba(245, 248, 255, 0.92);
+  text-shadow: 0 0 28px rgba(59, 247, 210, 0.15);
+}
+
+.bc-wordmarkBottom {
+  color: rgba(59, 247, 210, 0.9);
+  margin-top: 2px;
+}
+
+.bc-subtitle {
+  align-self: center;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.bc-layout {
+  padding: 0 clamp(16px, 4vw, 44px) 40px;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 1000px) {
+  .bc-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bc-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bc-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bc-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(18, 22, 40, 0.8), rgba(18, 22, 40, 0.52));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 20px 80px var(--shadow);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.bc-card::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: conic-gradient(from 180deg, rgba(59, 247, 210, 0.35), rgba(122, 167, 255, 0.25), rgba(255, 255, 255, 0));
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+
+.bc-card:hover::before {
+  opacity: 0.7;
+}
+
+.bc-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.bc-card h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 248, 255, 0.85);
+}
+
+.bc-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .bc-grid2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bc-check {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.bc-check input {
+  width: auto;
+}
+
+.bc-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bc-mt12 {
+  margin-top: 12px;
+}
+
+.bc-btn {
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.bc-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.bc-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.bc-btnPrimary {
+  border-color: rgba(59, 247, 210, 0.55);
+  background: rgba(59, 247, 210, 0.11);
+}
+
+.bc-btnDanger {
+  border-color: rgba(255, 77, 109, 0.7);
+  background: rgba(255, 77, 109, 0.1);
+}
+
+.bc-pill {
+  margin-top: 12px;
+  display: inline-block;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bc-pre {
+  margin: 14px 0 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  overflow: auto;
+  max-height: 340px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(245, 248, 255, 0.92);
+  white-space: pre;
+}
+
+.bc-preConsole {
+  max-height: 260px;
+}
+
+.bc-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 14px 0;
+}
+
+.bc-tabsRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.bc-tab {
+  text-align: left;
+  border-radius: 12px;
+  padding: 12px 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(245, 248, 255, 0.82);
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.bc-tab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.bc-tabActive {
+  border-color: rgba(59, 247, 210, 0.55);
+  background: rgba(59, 247, 210, 0.1);
+}
+
+.bc-console {
+  flex: 0 0 auto;
+}
+
