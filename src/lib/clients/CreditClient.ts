@@ -1,4 +1,15 @@
-import type { BondCreditClientConfig, AvailableCredit, CreditPosition, CreditRequest, CreditScore, Guarantee } from '../types.js';
+import type {
+  AvailableCredit,
+  BondCreditClientConfig,
+  CreditApproval,
+  CreditLimit,
+  CreditPosition,
+  CreditRequestInput,
+  CreditScore,
+  Eligibility,
+  RepayInput,
+  RepayResult,
+} from '../types.js';
 import { clampInt, nowIso, randomId } from '../util.js';
 
 export class CreditClient {
@@ -7,7 +18,17 @@ export class CreditClient {
   async getScore(): Promise<CreditScore> {
     // Scaffold default: treat the agent as reasonably healthy.
     // Replace with real indexed score retrieval when wiring to on-chain/indexer.
-    return { value: 700, updatedAt: nowIso() };
+    return {
+      value: 705,
+      tier: 'Prime',
+      updatedAt: nowIso(),
+      factors: {
+        subscription: 85,
+        payments: 92,
+        volume: 78,
+        speed: 95,
+      }
+    };
   }
 
   async getAvailableCredit(currency?: string): Promise<AvailableCredit> {
@@ -17,40 +38,100 @@ export class CreditClient {
     return { value: 1_000, currency: cur, updatedAt: nowIso() };
   }
 
-  async request(amount: string, purpose?: string): Promise<CreditRequest> {
-    const guarantee: Guarantee = {
-      id: randomId('g'),
-      agentId: this.cfg.agentId,
-      amount,
-      currency: amount.split(' ').at(1) ?? 'XLAYER',
-      expiresAt: new Date(Date.now() + 15 * 60_000).toISOString()
-    };
+  async request(input: CreditRequestInput): Promise<CreditApproval>;
+  async request(amount: string, purpose?: string): Promise<CreditApproval>;
+  async request(inputOrAmount: CreditRequestInput | string, purpose?: string): Promise<CreditApproval> {
+    const input: CreditRequestInput =
+      typeof inputOrAmount === 'string'
+        ? { amount: inputOrAmount, purpose }
+        : inputOrAmount;
+
+    // Scaffold approval based on available credit (very rough).
+    const { value: availableValue, currency } = await this.getAvailableCredit(undefined);
+    const requestedCurrency = input.amount.split(/\s+/)[1] ?? currency;
+    const amountValue = Number(input.amount.split(/\s+/)[0]);
+
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      return { approved: false, reason: 'Invalid amount' };
+    }
+    if (requestedCurrency !== currency && requestedCurrency !== 'OKB') {
+      return { approved: false, reason: 'Unsupported currency' };
+    }
+    if (amountValue > availableValue) {
+      return { approved: false, reason: 'Insufficient available credit' };
+    }
+
+    const creditId = 'cred_' + randomId('id').slice(0, 12);
+    const feeBps = clampInt(5, 0, 1000); // Scaffold: 0.05% fee
+    const fee = `0.${Math.floor(Math.random() * 9999).toString().padStart(4, '0')} OKB`;
+    const deadline = new Date(Date.now() + 60 * 60_000).toISOString();
 
     return {
-      id: randomId('cr'),
-      agentId: this.cfg.agentId,
-      amount,
-      purpose,
-      feeBps: clampInt(50, 0, 10_000),
-      createdAt: nowIso(),
-      guarantee
+      approved: true,
+      creditId,
+      amount: input.amount,
+      fee,
+      deadline
     };
   }
 
+  async repay(input: RepayInput): Promise<RepayResult>;
+  async repay(creditId: string, amount: string): Promise<RepayResult>;
+  async repay(arg1: RepayInput | string, arg2?: string): Promise<RepayResult> {
+    const input: RepayInput = typeof arg1 === 'string' ? { creditId: arg1, amount: arg2 ?? '' } : arg1;
+    if (!input.creditId) return { success: false, newScore: 0 };
+    if (!input.amount) return { success: false, newScore: 0 };
+
+    // Scaffold: pretend repayment increases score by +5.
+    return {
+      success: true,
+      newScore: 710,
+      txHash: '0x' + randomId('tx').slice(0, 16)
+    };
+  }
+
+  async checkEligibility(amount: string): Promise<Eligibility> {
+    const amountValue = Number(amount.split(/\s+/)[0]);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      return { eligible: false, reason: 'Invalid amount' };
+    }
+
+    const score = await this.getScore();
+    if (score.value <= 500) {
+      return { eligible: false, reason: 'Credit score too low' };
+    }
+
+    const limit = await this.getLimit();
+    const maxAmountValue = Number(limit.available.split(/\s+/)[0]);
+    if (amountValue > maxAmountValue) {
+      return { eligible: false, reason: 'Amount exceeds max eligible' };
+    }
+
+    return { eligible: true, maxAmount: limit.available, reason: null };
+  }
+
+  async getLimit(): Promise<CreditLimit> {
+    // Scaffold: align with available credit scaffold
+    const available = await this.getAvailableCredit('OKB');
+    const used = 0.1 * (available.value / 10);
+    const current = available.value * 0.55;
+    const availableValue = Math.max(0, current - used);
+    const nextTier = available.value * 0.75;
+
+    return {
+      current: `${current.toFixed(2)} OKB`,
+      used: `${used.toFixed(2)} OKB`,
+      available: `${availableValue.toFixed(2)} OKB`,
+      nextTier: `${nextTier.toFixed(2)} OKB`
+    };
+  }
+
+  // Kept for future compatibility with older scaffold.
   async getOutstanding(): Promise<CreditPosition> {
     return {
       agentId: this.cfg.agentId,
       outstanding: '0',
-      currency: 'XLAYER',
-      updatedAt: nowIso()
-    };
-  }
-
-  async repay(amount: string): Promise<CreditPosition> {
-    return {
-      agentId: this.cfg.agentId,
-      outstanding: '0',
-      currency: amount.split(' ').at(1) ?? 'XLAYER',
+      currency: 'OKB',
       updatedAt: nowIso()
     };
   }

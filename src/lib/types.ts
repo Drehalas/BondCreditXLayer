@@ -23,6 +23,7 @@ export type SubscriptionStatus = {
 
 export type CreditScore = {
   value: number; // 0..1000
+  tier?: string;
   updatedAt: string;
   factors?: Record<string, number>;
 };
@@ -46,9 +47,49 @@ export type CreditRequest = {
   agentId: string;
   amount: string;
   purpose?: string;
+  expectedReturn?: string;
   feeBps: number;
   createdAt: string;
   guarantee?: Guarantee;
+};
+
+export type CreditRequestInput = {
+  amount: string;
+  purpose?: string;
+  expectedReturn?: string;
+};
+
+export type CreditApproval = {
+  approved: boolean;
+  creditId?: string;
+  amount?: string;
+  fee?: string;
+  deadline?: string;
+  reason?: string | null;
+};
+
+export type RepayInput = {
+  creditId: string;
+  amount: string;
+};
+
+export type RepayResult = {
+  success: boolean;
+  newScore: number;
+  txHash?: string;
+};
+
+export type Eligibility = {
+  eligible: boolean;
+  maxAmount?: string;
+  reason: string | null;
+};
+
+export type CreditLimit = {
+  current: string;
+  used: string;
+  available: string;
+  nextTier: string;
 };
 
 export type CreditPosition = {
