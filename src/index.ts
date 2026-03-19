@@ -9,6 +9,13 @@ export type {
   CreditPosition,
   Guarantee,
   AnalyticsEvent,
+  CreditHealth,
+  CreditHistory,
+  AnalyticsSimulateAction,
+  AnalyticsSimulation,
+  AnalyticsReport,
+  AnalyticsMonitorUpdate,
+  MonitorStop,
   X402GuaranteeRequest,
   X402GuaranteeResponse,
   X402GuaranteeStatus

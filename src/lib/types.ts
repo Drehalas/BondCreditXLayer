@@ -128,6 +128,55 @@ export type AnalyticsEvent =
   | { type: 'subscription'; timestamp: string; payload: unknown }
   | { type: 'credit'; timestamp: string; payload: unknown };
 
+export type CreditHealthStatus = 'healthy' | 'warning' | 'critical';
+
+export type CreditHealth = {
+  status: CreditHealthStatus;
+  metrics: {
+    creditUtilization: string;
+    repaymentRate: string;
+    avgRepaymentTime: string;
+    scoreTrend: string;
+  };
+  warnings: string[];
+};
+
+export type CreditHistory = {
+  scores: Array<{ date: string; score: number }>;
+  transactions: number;
+  totalCreditUsed: string;
+  totalRepaid: string;
+};
+
+export type AnalyticsSimulateAction =
+  | { type: 'subscribe'; duration: string }
+  | { type: 'payment'; count: number; success: boolean }
+  | { type: 'repay'; amount: string; time: string };
+
+export type AnalyticsSimulation = {
+  projectedScore: number;
+  projectedLimit: string;
+  timeToAchieve: string;
+  confidence: 'high' | 'medium' | 'low';
+};
+
+export type AnalyticsReport = {
+  summary: {
+    avgScore: number;
+    totalCreditUsed: string;
+    totalRepaid: string;
+    profitFromCredit: string;
+    roi: string;
+  };
+  recommendations: string[];
+};
+
+export type AnalyticsMonitorUpdate =
+  | { type: 'warning'; message: string }
+  | { type: 'info'; message: string };
+
+export type MonitorStop = () => void;
+
 export type X402GuaranteeRequest = {
   recipient: string;
   amount: string;
