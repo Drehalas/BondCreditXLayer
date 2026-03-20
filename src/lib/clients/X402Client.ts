@@ -11,7 +11,15 @@ import {
   InsufficientCreditError,
   SubscriptionInactiveError
 } from '../errors.js';
-import { parseAmount, randomHex, nowIso } from '../util.js';
+import { parseAmount, randomHex } from '../util.js';
+import {
+  getGuarantorReadContract,
+  getGuarantorWriteContract,
+  hasGuarantorContract,
+  minutesRemainingFromUnixSec,
+  parseAmountToWei
+} from '../onchain.js';
+import { isAddress, isHexString } from 'ethers';
 
 type SubscriptionLike = {
   check(): Promise<{ active: boolean }>;
@@ -48,6 +56,38 @@ export class X402Client {
     const available = await this.deps.credit.getAvailableCredit(currency);
     if (available.value < amountValue) throw new InsufficientCreditError('Available credit is insufficient');
 
+    if (hasGuarantorContract(this.cfg)) {
+      const write = getGuarantorWriteContract(this.cfg);
+      const read = getGuarantorReadContract(this.cfg);
+      if (!write || !read) {
+        throw new Error('On-chain x402 mode requires rpcUrl, guarantor address, and privateKey');
+      }
+      if (!isAddress(input.recipient)) {
+        throw new Error('Recipient must be a valid EVM address in on-chain x402 mode');
+      }
+
+      const amountWei = parseAmountToWei(input.amount);
+      const ttlSeconds = Math.max(60, this.cfg.x402?.defaultGuaranteeTtlSeconds ?? 25 * 60);
+
+      const guaranteeId = await write.createGuarantee.staticCall(input.recipient, amountWei, ttlSeconds);
+      const tx = await write.createGuarantee(input.recipient, amountWei, ttlSeconds);
+      await tx.wait();
+
+      const status = await read.checkGuarantee(guaranteeId);
+      const expiresAt = new Date(Number(status[4]) * 1000).toISOString();
+
+      return {
+        guaranteeId,
+        proof: tx.hash,
+        expiresAt,
+        x402Payload: {
+          amount: input.amount,
+          recipient: input.recipient,
+          guarantor: this.cfg.contracts?.paymentGuarantor ?? '0x0'
+        }
+      };
+    }
+
     const guaranteeId = 'guar_' + randomHex(12).slice(2);
     const expiresAt = new Date(Date.now() + 25 * 60_000).toISOString();
     const proof = randomHex(32);
@@ -76,6 +116,19 @@ export class X402Client {
   }
 
   async checkGuarantee(guaranteeId: string): Promise<X402GuaranteeStatus> {
+    if (hasGuarantorContract(this.cfg) && isHexString(guaranteeId, 32)) {
+      const read = getGuarantorReadContract(this.cfg);
+      if (!read) throw new Error('On-chain x402 mode requires rpcUrl and guarantor address');
+
+      const [active, used, cancelled, repaid, expiresAt] = await read.checkGuarantee(guaranteeId);
+      return {
+        active: Boolean(active),
+        used: Boolean(used),
+        cancelled: Boolean(cancelled || repaid),
+        expiresIn: minutesRemainingFromUnixSec(expiresAt)
+      };
+    }
+
     const record = this.guaranteeState.get(guaranteeId);
     if (!record) {
       // For scaffolding, treat unknown as inactive + not used.
@@ -86,6 +139,14 @@ export class X402Client {
   }
 
   async cancelGuarantee(guaranteeId: string): Promise<{ ok: true }> {
+    if (hasGuarantorContract(this.cfg) && isHexString(guaranteeId, 32)) {
+      const write = getGuarantorWriteContract(this.cfg);
+      if (!write) throw new Error('On-chain x402 mode requires rpcUrl, guarantor address, and privateKey');
+      const tx = await write.cancelGuarantee(guaranteeId);
+      await tx.wait();
+      return { ok: true };
+    }
+
     const record = this.guaranteeState.get(guaranteeId);
     if (!record) throw new GuaranteeNotFoundError('Guarantee not found');
     record.status.active = false;

@@ -11,6 +11,13 @@ import type {
   RepayResult,
 } from '../types.js';
 import { clampInt, nowIso, randomId } from '../util.js';
+import {
+  formatWeiAmount,
+  getGuarantorReadContract,
+  hasGuarantorContract,
+  resolveAgentAddress
+} from '../onchain.js';
+import { formatEther } from 'ethers';
 
 export class CreditClient {
   constructor(private readonly cfg: BondCreditClientConfig) {}
@@ -32,6 +39,23 @@ export class CreditClient {
   }
 
   async getAvailableCredit(currency?: string): Promise<AvailableCredit> {
+    if (hasGuarantorContract(this.cfg)) {
+      const read = getGuarantorReadContract(this.cfg);
+      const agent = resolveAgentAddress(this.cfg);
+      if (!read || !agent) {
+        throw new Error('On-chain credit mode requires rpcUrl, guarantor address, and resolvable agent address');
+      }
+
+      const freeLiquidityWei = (await read.freeLiquidityWei()) as bigint;
+      const outstandingWei = (await read.outstandingByAgent(agent)) as bigint;
+
+      // Phase-1 heuristic: agent can use free liquidity net of current outstanding debt.
+      const availableWei = freeLiquidityWei > outstandingWei ? (freeLiquidityWei - outstandingWei) : 0n;
+      const cur = currency ?? 'OKB';
+
+      return { value: Number(formatEther(availableWei)), currency: cur, updatedAt: nowIso() };
+    }
+
     // Scaffold default: provide a large allowance.
     // Real implementation should query ProgressiveLimits / outstanding position.
     const cur = currency ?? 'OKB';
@@ -111,6 +135,29 @@ export class CreditClient {
   }
 
   async getLimit(): Promise<CreditLimit> {
+    if (hasGuarantorContract(this.cfg)) {
+      const read = getGuarantorReadContract(this.cfg);
+      const agent = resolveAgentAddress(this.cfg);
+      if (!read || !agent) {
+        throw new Error('On-chain credit mode requires rpcUrl, guarantor address, and resolvable agent address');
+      }
+
+      const freeLiquidityWei = (await read.freeLiquidityWei()) as bigint;
+      const outstandingWei = (await read.outstandingByAgent(agent)) as bigint;
+
+      // Conservative Phase-1 cap: up to 55% of free liquidity as current limit.
+      const currentWei = (freeLiquidityWei * 55n) / 100n;
+      const availableWei = currentWei > outstandingWei ? (currentWei - outstandingWei) : 0n;
+      const nextTierWei = (currentWei * 125n) / 100n;
+
+      return {
+        current: formatWeiAmount(currentWei),
+        used: formatWeiAmount(outstandingWei),
+        available: formatWeiAmount(availableWei),
+        nextTier: formatWeiAmount(nextTierWei)
+      };
+    }
+
     // Scaffold: align with available credit scaffold
     const available = await this.getAvailableCredit('OKB');
     const used = 0.1 * (available.value / 10);
@@ -128,6 +175,22 @@ export class CreditClient {
 
   // Kept for future compatibility with older scaffold.
   async getOutstanding(): Promise<CreditPosition> {
+    if (hasGuarantorContract(this.cfg)) {
+      const read = getGuarantorReadContract(this.cfg);
+      const agent = resolveAgentAddress(this.cfg);
+      if (!read || !agent) {
+        throw new Error('On-chain credit mode requires rpcUrl, guarantor address, and resolvable agent address');
+      }
+
+      const outstandingWei = (await read.outstandingByAgent(agent)) as bigint;
+      return {
+        agentId: this.cfg.agentId,
+        outstanding: formatWeiAmount(outstandingWei),
+        currency: 'OKB',
+        updatedAt: nowIso()
+      };
+    }
+
     return {
       agentId: this.cfg.agentId,
       outstanding: '0',

@@ -4,6 +4,12 @@ export type BondCreditClientConfig = {
   network: Network;
   agentId: string;
   /**
+   * Optional explicit EVM address for the agent.
+   * If omitted, clients may derive it from `agentId` (when it is an address)
+   * or from `privateKey`.
+   */
+  agentAddress?: string;
+  /**
    * Optional signer secret for future on-chain actions.
    * This client scaffolding does not transmit keys anywhere.
    */
@@ -12,6 +18,21 @@ export type BondCreditClientConfig = {
    * Optional RPC URL override.
    */
   rpcUrl?: string;
+  /**
+   * Optional deployed contract addresses for on-chain mode.
+   * If omitted, clients fall back to in-memory scaffold behavior.
+   */
+  contracts?: {
+    subscriptionManager?: string;
+    paymentGuarantor?: string;
+  };
+  /**
+   * Optional x402 integration options for hybrid verification mode.
+   */
+  x402?: {
+    defaultGuaranteeTtlSeconds?: number;
+    verifierEndpoint?: string;
+  };
 };
 
 export type SubscriptionStatus = {

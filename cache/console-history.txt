@@ -1,0 +1,50 @@
+await g.checkGuarantee(gid);
+await tx4.wait();
+const tx4 = await g.repayGuarantee(gid, { value: repayAmount });
+const repayAmount = amountWei + fee;
+const fee = (amountWei * feeBps) / 10000n;
+const feeBps = await g.feeBps();
+// repay principal + 0.5% fee (feeBps=50)
+await g.checkGuarantee(gid);
+await tx3.wait();
+const tx3 = await g.markGuaranteeUsed(gid, payloadHash);
+const payloadHash = ethers.keccak256(ethers.toUtf8Bytes("x402-payload-demo"));
+// mark as used (your deployer has VERIFIER_ROLE by default)
+await g.checkGuarantee(gid);
+await tx2.wait();
+const tx2 = await g.createGuarantee(recipient, amountWei, ttl);
+const gid = await g.createGuarantee.staticCall(recipient, amountWei, ttl);
+// get ID first using staticCall, then send tx
+const ttl = 600;
+const amountWei = ethers.parseEther("0.01");
+const recipient = signer.address;
+// use any valid testnet address as recipient
+const g = new ethers.Contract(GUAR, guarAbi, signer);
+];  "function feeBps() view returns (uint256)"  "function repayGuarantee(bytes32 guaranteeId) payable",  "function markGuaranteeUsed(bytes32 guaranteeId, bytes32 x402PayloadHash)",  "function checkGuarantee(bytes32 guaranteeId) view returns (bool active, bool used, bool cancelled, bool repaid, uint256 expiresAt, bytes32 payloadHash)",  "function createGuarantee(address recipient, uint256 amountWei, uint256 ttlSeconds) returns (bytes32)",const guarAbi = [
+const GUAR = "0x45565b125Dc284330d5fB4f85530346Adc3B2751";
+await sub.isActive(signer.address);
+await sub.checkStatus(signer.address);
+await tx1.wait();
+const tx1 = await sub.subscribe(Number(days), { value: total });
+const total = price * days; // should be 0.03 OKB at 0.001/day
+const days = 30n;
+const price = await sub.pricePerDayWei();
+const sub = new ethers.Contract(SUB, subAbi, signer);
+];  "function isActive(address agent) view returns (bool)"  "function checkStatus(address agent) view returns (bool active, uint256 expiryDate, uint256 daysLeft, uint256 paymentCount)",  "function subscribe(uint256 daysToBuy) payable returns (uint256)",  "function pricePerDayWei() view returns (uint256)",const subAbi = [
+const [signer] = await ethers.getSigners();
+const SUB = "0x963dceE3ee2861f8c32E9d727aaA2bFE934D0E7c";
+ethers.formatEther(await g.freeLiquidityWei())
+ethers.formatEther(await ethers.provider.getBalance(GUARANTOR))
+// 3) Pretty print in OKB
+await g.freeLiquidityWei()
+// 2) Free liquidity tracked by contract
+await ethers.provider.getBalance(GUARANTOR)
+// 1) Contract balance
+(await g.freeLiquidityWei()).toString();
+await tx.wait();
+const tx = await g.fundPool({ value: ethers.parseEther("0.05") });
+// fund with 0.05 OKB (example)
+const g = new ethers.Contract(GUARANTOR, abi, signer);
+];  "function freeLiquidityWei() view returns (uint256)"  "function fundPool() payable",const abi = [
+const [signer] = await ethers.getSigners();
+const GUARANTOR = "0x45565b125Dc284330d5fB4f85530346Adc3B2751";

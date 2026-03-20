@@ -18,6 +18,9 @@ export type {
   MonitorStop,
   X402GuaranteeRequest,
   X402GuaranteeResponse,
-  X402GuaranteeStatus
+  X402GuaranteeStatus,
+  CreditApproval,
+   CreditLimit,
+  Eligibility
 } from './lib/types.js';
 

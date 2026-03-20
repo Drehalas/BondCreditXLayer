@@ -5,7 +5,16 @@ import type {
   SubscribeResult,
   SubscriptionStatus
 } from '../types.js';
-import { nowIso, randomHex } from '../util.js';
+import { randomHex } from '../util.js';
+import {
+  dateOnlyFromUnixSec,
+  daysFromDuration,
+  formatWeiAmount,
+  getSubscriptionReadContract,
+  getSubscriptionWriteContract,
+  hasSubscriptionContract,
+  resolveAgentAddress
+} from '../onchain.js';
 
 export class SubscriptionClient {
   private expiryMs: number | null = null;
@@ -20,11 +29,35 @@ export class SubscriptionClient {
 
   /**
    * Subscribe to credit monitoring via x402 microtransaction.
-   * This is scaffold-only; replace with on-chain/indexer calls later.
+   * Uses on-chain mode when configured, otherwise falls back to scaffold mode.
    */
   async subscribe(input: SubscribeInput = { duration: '30 days', autoRenew: true }): Promise<SubscribeResult> {
+    if (hasSubscriptionContract(this.cfg)) {
+      const days = daysFromDuration(input.duration ?? '30 days');
+      const read = getSubscriptionReadContract(this.cfg);
+      const write = getSubscriptionWriteContract(this.cfg);
+
+      if (!read || !write) {
+        throw new Error('On-chain subscription mode requires rpcUrl, contract address, and privateKey');
+      }
+
+      const pricePerDayWei = (await read.pricePerDayWei()) as bigint;
+      const total = pricePerDayWei * BigInt(days);
+
+      const tx = await write.subscribe(days, { value: total });
+      await tx.wait();
+
+      const status = await this.checkStatus();
+      return {
+        status: status.active ? 'active' : 'inactive',
+        expiry: status.expiryDate ?? new Date().toISOString().slice(0, 10),
+        txHash: tx.hash,
+        amount: formatWeiAmount(total)
+      };
+    }
+
     const duration = input.duration ?? '30 days';
-    const days = this.parseDays(duration);
+    const days = daysFromDuration(duration);
     const startedAt = Date.now();
     const expiryMs = startedAt + days * 24 * 60 * 60 * 1000;
 
@@ -44,6 +77,22 @@ export class SubscriptionClient {
   }
 
   async checkStatus(): Promise<CheckStatusResult> {
+    if (hasSubscriptionContract(this.cfg)) {
+      const read = getSubscriptionReadContract(this.cfg);
+      const agent = resolveAgentAddress(this.cfg);
+      if (!read || !agent) {
+        throw new Error('On-chain subscription mode requires a resolvable agent address');
+      }
+
+      const [active, expiryDate, daysLeft, paymentCount] = await read.checkStatus(agent);
+      return {
+        active: Boolean(active),
+        expiryDate: Number(expiryDate) > 0 ? dateOnlyFromUnixSec(expiryDate) : undefined,
+        daysLeft: Number(daysLeft),
+        paymentsMade: Number(paymentCount)
+      };
+    }
+
     if (!this.expiryMs) {
       return { active: false, daysLeft: 0, paymentsMade: this.paymentsMade };
     }
@@ -61,15 +110,31 @@ export class SubscriptionClient {
   }
 
   async renew(): Promise<SubscribeResult> {
-    // Scaffold: renew for 30 days from now.
-    return this.subscribe({ duration: '30 days', autoRenew: true });
-  }
+    if (hasSubscriptionContract(this.cfg)) {
+      const read = getSubscriptionReadContract(this.cfg);
+      const write = getSubscriptionWriteContract(this.cfg);
+      if (!read || !write) {
+        throw new Error('On-chain renew requires rpcUrl, contract address, and privateKey');
+      }
 
-  private parseDays(duration: string): number {
-    // Accept patterns like "30 days" or "12 day".
-    const match = duration.toLowerCase().match(/(\d+)\s*day/);
-    const d = match ? Number(match[1]) : 30;
-    return Math.max(1, Math.trunc(d));
+      const days = 30;
+      const pricePerDayWei = (await read.pricePerDayWei()) as bigint;
+      const total = pricePerDayWei * BigInt(days);
+
+      const tx = await write.renew(days, { value: total });
+      await tx.wait();
+
+      const status = await this.checkStatus();
+      return {
+        status: status.active ? 'active' : 'inactive',
+        expiry: status.expiryDate ?? new Date().toISOString().slice(0, 10),
+        txHash: tx.hash,
+        amount: formatWeiAmount(total)
+      };
+    }
+
+    // Scaffold fallback: renew for 30 days from now.
+    return this.subscribe({ duration: '30 days', autoRenew: true });
   }
 }
 

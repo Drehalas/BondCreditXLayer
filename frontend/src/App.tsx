@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import { BondCreditClient } from '../../src/index';
-import type { BondCreditClientConfig } from '../../src/index';
+import { useMemo, useState } from "react";
+import { BondCreditClient } from "../../src/index";
 import type {
+  BondCreditClientConfig,
   CreditApproval,
   CreditHistory,
   CreditLimit,
@@ -9,22 +9,27 @@ import type {
   X402GuaranteeResponse,
   AnalyticsMonitorUpdate,
   AnalyticsReport,
-  CreditHealth
-} from '../../src/index';
-import './styles/app.css';
+  CreditHealth,
+} from "../../src/index";
+import "./styles/app.css";
 
-type TabKey = 'subscribe' | 'x402' | 'credit' | 'analytics';
+type TabKey = "subscribe" | "x402" | "credit" | "analytics";
 
 function initialClientConfig(): Omit<BondCreditClientConfig, never> {
   return {
-    network: 'xlayer-testnet',
-    agentId: 'agent-0x123...',
-    privateKey: ''
+    network: "xlayer-testnet",
+    agentId: "0xd931713CD30c6dBD729EDce527Ac942f7A0EC273",
+    privateKey: import.meta.env.VITE_DEPLOYER_PRIVATE_KEY || "",
+    rpcUrl: "https://testrpc.xlayer.tech",
+    contracts: {
+      subscriptionManager: "0x963dceE3ee2861f8c32E9d727aaA2bFE934D0E7c",
+      paymentGuarantor: "0x45565b125Dc284330d5fB4f85530346Adc3B2751",
+    },
   };
 }
 
 export default function App() {
-  const [tab, setTab] = useState<TabKey>('subscribe');
+  const [tab, setTab] = useState<TabKey>("subscribe");
 
   const [cfg, setCfg] = useState(() => initialClientConfig());
 
@@ -32,38 +37,65 @@ export default function App() {
     const config: BondCreditClientConfig = {
       network: cfg.network,
       agentId: cfg.agentId,
-      privateKey: cfg.privateKey || undefined
+      privateKey: cfg.privateKey || undefined,
+      rpcUrl: cfg.rpcUrl,
+      contracts: cfg.contracts,
     };
     return new BondCreditClient(config);
-  }, [cfg.agentId, cfg.network, cfg.privateKey]);
+  }, [cfg.agentId, cfg.network, cfg.privateKey, cfg.rpcUrl, cfg.contracts]);
 
   // Shared status output for quick feedback.
-  const [log, setLog] = useState<string>('');
-  const appendLog = (s: unknown) => setLog(prev => (prev ? `${prev}\n${String(s)}` : String(s)));
+  const [log, setLog] = useState<string>("");
+  const appendLog = (s: unknown) =>
+    setLog((prev) => (prev ? `${prev}\n${String(s)}` : String(s)));
 
   // Subscription
-  const [duration, setDuration] = useState('30 days');
+  const [duration, setDuration] = useState("30 days");
   const [autoRenew, setAutoRenew] = useState(true);
-  const [subStatus, setSubStatus] = useState<ReturnType<typeof client.subscription.checkStatus> extends Promise<infer T> ? T : never>();
+  const [subStatus, setSubStatus] =
+    useState<
+      ReturnType<typeof client.subscription.checkStatus> extends Promise<
+        infer T
+      >
+        ? T
+        : never
+    >();
 
   // x402
   const [x402Input, setX402Input] = useState({
-    recipient: '0xDataOracle...',
-    amount: '0.01 OKB',
-    service: 'premium-price-feed',
-    endpoint: 'https://api.data.com/x402'
+    recipient: "0xd931713CD30c6dBD729EDce527Ac942f7A0EC273",
+    amount: "0.01 OKB",
+    service: "premium-price-feed",
+    endpoint: "https://api.data.com/x402",
   });
-  const [guarantee, setGuarantee] = useState<X402GuaranteeResponse | null>(null);
-  const [guaranteeStatus, setGuaranteeStatus] = useState<Awaited<ReturnType<typeof client.x402.checkGuarantee>> | null>(null);
+  const [guarantee, setGuarantee] = useState<X402GuaranteeResponse | null>(
+    null,
+  );
+  const [guaranteeStatus, setGuaranteeStatus] = useState<Awaited<
+    ReturnType<typeof client.x402.checkGuarantee>
+  > | null>(null);
 
   // Credit
-  const [score, setScore] = useState<Awaited<ReturnType<typeof client.credit.getScore>> | null>(null);
+  const [score, setScore] = useState<Awaited<
+    ReturnType<typeof client.credit.getScore>
+  > | null>(null);
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
   const [limit, setLimit] = useState<CreditLimit | null>(null);
-  const [creditApproval, setCreditApproval] = useState<CreditApproval | null>(null);
-  const [repayResult, setRepayResult] = useState<Awaited<ReturnType<typeof client.credit.repay>> | null>(null);
-  const [creditRequestInput, setCreditRequestInput] = useState({ amount: '0.1 OKB', purpose: 'arbitrage', expectedReturn: '0.05 OKB' });
-  const [repayInput, setRepayInput] = useState({ creditId: 'cred_...', amount: '0.1005 OKB' });
+  const [creditApproval, setCreditApproval] = useState<CreditApproval | null>(
+    null,
+  );
+  const [repayResult, setRepayResult] = useState<Awaited<
+    ReturnType<typeof client.credit.repay>
+  > | null>(null);
+  const [creditRequestInput, setCreditRequestInput] = useState({
+    amount: "0.1 OKB",
+    purpose: "arbitrage",
+    expectedReturn: "0.05 OKB",
+  });
+  const [repayInput, setRepayInput] = useState({
+    creditId: "cred_...",
+    amount: "0.1005 OKB",
+  });
 
   // Analytics
   const [health, setHealth] = useState<CreditHealth | null>(null);
@@ -133,7 +165,7 @@ export default function App() {
     setCreditApproval(res);
     appendLog(`request(): ${JSON.stringify(res, null, 2)}`);
     if (res.approved && res.creditId) {
-      setRepayInput(prev => ({ ...prev, creditId: res.creditId! }));
+      setRepayInput((prev) => ({ ...prev, creditId: res.creditId! }));
     }
   }
 
@@ -150,7 +182,7 @@ export default function App() {
   }
 
   async function handleAnalyticsHistory() {
-    const res = await client.analytics.getHistory('7d');
+    const res = await client.analytics.getHistory("7d");
     setHistory(res);
     appendLog(`getHistory('7d'): ${JSON.stringify(res, null, 2)}`);
   }
@@ -171,21 +203,37 @@ export default function App() {
     }
 
     setMonitoring(true);
-    const stop = await client.analytics.monitor((update: AnalyticsMonitorUpdate) => {
-      appendLog(`monitor(): ${update.type} - ${update.message}`);
-      // Keep the UI responsive; no extra state churn needed.
-    });
+    const stop = await client.analytics.monitor(
+      (update: AnalyticsMonitorUpdate) => {
+        appendLog(`monitor(): ${update.type} - ${update.message}`);
+        // Keep the UI responsive; no extra state churn needed.
+      },
+    );
     setStop(stop);
   }
 
   return (
     <div className="bc-root">
-      <svg className="bc-noise" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        className="bc-noise"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <filter id="bcNoise">
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch" />
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.9"
+            numOctaves="3"
+            stitchTiles="stitch"
+          />
           <feColorMatrix type="saturate" values="0" />
         </filter>
-        <rect width="100%" height="100%" filter="url(#bcNoise)" opacity="0.22" />
+        <rect
+          width="100%"
+          height="100%"
+          filter="url(#bcNoise)"
+          opacity="0.22"
+        />
       </svg>
 
       <header className="bc-header">
@@ -193,7 +241,9 @@ export default function App() {
           <div className="bc-wordmarkTop">BOND</div>
           <div className="bc-wordmarkBottom">CREDIT</div>
         </div>
-        <div className="bc-subtitle">xlayer-testnet control panel (scaffold)</div>
+        <div className="bc-subtitle">
+          xlayer-testnet control panel (scaffold)
+        </div>
       </header>
 
       <main className="bc-layout">
@@ -204,7 +254,13 @@ export default function App() {
               Network
               <select
                 value={cfg.network}
-                onChange={e => setCfg(prev => ({ ...prev, network: e.target.value as BondCreditClientConfig['network'] }))}
+                onChange={(e) =>
+                  setCfg((prev) => ({
+                    ...prev,
+                    network: e.target
+                      .value as BondCreditClientConfig["network"],
+                  }))
+                }
               >
                 <option value="xlayer-testnet">xlayer-testnet</option>
                 <option value="xlayer-mainnet">xlayer-mainnet</option>
@@ -212,30 +268,41 @@ export default function App() {
             </label>
             <label>
               Agent ID
-              <input value={cfg.agentId} onChange={e => setCfg(prev => ({ ...prev, agentId: e.target.value }))} />
+              <input
+                value={cfg.agentId}
+                onChange={(e) =>
+                  setCfg((prev) => ({ ...prev, agentId: e.target.value }))
+                }
+              />
             </label>
             <label>
               Private Key (unused in scaffold)
               <input
                 value={cfg.privateKey}
-                onChange={e => setCfg(prev => ({ ...prev, privateKey: e.target.value }))}
+                onChange={(e) =>
+                  setCfg((prev) => ({ ...prev, privateKey: e.target.value }))
+                }
                 placeholder="optional"
               />
             </label>
-            <div className="bc-pill">Client is created from SDK `BondCreditClient`</div>
+            <div className="bc-pill">
+              Client is created from SDK `BondCreditClient`
+            </div>
           </section>
 
           <section className="bc-card bc-tabs">
             <div className="bc-tabsRow">
-              {([
-                ['subscribe', 'Subscribe'],
-                ['x402', 'Guarantee (x402)'],
-                ['credit', 'Credit'],
-                ['analytics', 'Analytics']
-              ] as Array<[TabKey, string]>).map(([k, label]) => (
+              {(
+                [
+                  ["subscribe", "Subscribe"],
+                  ["x402", "Guarantee (x402)"],
+                  ["credit", "Credit"],
+                  ["analytics", "Analytics"],
+                ] as Array<[TabKey, string]>
+              ).map(([k, label]) => (
                 <button
                   key={k}
-                  className={k === tab ? 'bc-tab bc-tabActive' : 'bc-tab'}
+                  className={k === tab ? "bc-tab bc-tabActive" : "bc-tab"}
                   onClick={() => setTab(k)}
                 >
                   {label}
@@ -246,70 +313,141 @@ export default function App() {
         </aside>
 
         <section className="bc-main">
-          {tab === 'subscribe' && (
+          {tab === "subscribe" && (
             <div className="bc-stack">
               <div className="bc-card">
                 <h2>Subscription</h2>
                 <div className="bc-grid2">
                   <label>
                     Duration
-                    <input value={duration} onChange={e => setDuration(e.target.value)} />
+                    <input
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                    />
                   </label>
                   <label className="bc-check">
-                    <input type="checkbox" checked={autoRenew} onChange={e => setAutoRenew(e.target.checked)} />
+                    <input
+                      type="checkbox"
+                      checked={autoRenew}
+                      onChange={(e) => setAutoRenew(e.target.checked)}
+                    />
                     Auto-renew
                   </label>
                 </div>
                 <div className="bc-actions">
-                  <button className="bc-btn bc-btnPrimary" onClick={handleSubscribe}>Subscribe</button>
-                  <button className="bc-btn" onClick={handleCheckStatus}>Check status</button>
-                  <button className="bc-btn" onClick={handleRenew}>Renew</button>
+                  <button
+                    className="bc-btn bc-btnPrimary"
+                    onClick={handleSubscribe}
+                  >
+                    Subscribe
+                  </button>
+                  <button className="bc-btn" onClick={handleCheckStatus}>
+                    Check status
+                  </button>
+                  <button className="bc-btn" onClick={handleRenew}>
+                    Renew
+                  </button>
                 </div>
                 {subStatus && (
-                  <pre className="bc-pre">{JSON.stringify(subStatus, null, 2)}</pre>
+                  <pre className="bc-pre">
+                    {JSON.stringify(subStatus, null, 2)}
+                  </pre>
                 )}
               </div>
             </div>
           )}
 
-          {tab === 'x402' && (
+          {tab === "x402" && (
             <div className="bc-stack">
               <div className="bc-card">
                 <h2>x402 Guarantee</h2>
                 <div className="bc-grid2">
                   <label>
                     Recipient
-                    <input value={x402Input.recipient} onChange={e => setX402Input(prev => ({ ...prev, recipient: e.target.value }))} />
+                    <input
+                      value={x402Input.recipient}
+                      onChange={(e) =>
+                        setX402Input((prev) => ({
+                          ...prev,
+                          recipient: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                   <label>
                     Amount
-                    <input value={x402Input.amount} onChange={e => setX402Input(prev => ({ ...prev, amount: e.target.value }))} />
+                    <input
+                      value={x402Input.amount}
+                      onChange={(e) =>
+                        setX402Input((prev) => ({
+                          ...prev,
+                          amount: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                   <label>
                     Service
-                    <input value={x402Input.service} onChange={e => setX402Input(prev => ({ ...prev, service: e.target.value }))} />
+                    <input
+                      value={x402Input.service}
+                      onChange={(e) =>
+                        setX402Input((prev) => ({
+                          ...prev,
+                          service: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                   <label>
                     Endpoint
-                    <input value={x402Input.endpoint} onChange={e => setX402Input(prev => ({ ...prev, endpoint: e.target.value }))} />
+                    <input
+                      value={x402Input.endpoint}
+                      onChange={(e) =>
+                        setX402Input((prev) => ({
+                          ...prev,
+                          endpoint: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                 </div>
                 <div className="bc-actions">
-                  <button className="bc-btn bc-btnPrimary" onClick={handleGuarantee}>Guarantee</button>
-                  <button className="bc-btn" onClick={handleCheckGuarantee} disabled={!guarantee}>Check</button>
-                  <button className="bc-btn" onClick={handleCancelGuarantee} disabled={!guarantee}>Cancel</button>
+                  <button
+                    className="bc-btn bc-btnPrimary"
+                    onClick={handleGuarantee}
+                  >
+                    Guarantee
+                  </button>
+                  <button
+                    className="bc-btn"
+                    onClick={handleCheckGuarantee}
+                    disabled={!guarantee}
+                  >
+                    Check
+                  </button>
+                  <button
+                    className="bc-btn"
+                    onClick={handleCancelGuarantee}
+                    disabled={!guarantee}
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
 
               {guarantee && (
                 <div className="bc-card">
                   <h2>Guarantee Payload</h2>
-                  <pre className="bc-pre">{JSON.stringify(guarantee, null, 2)}</pre>
+                  <pre className="bc-pre">
+                    {JSON.stringify(guarantee, null, 2)}
+                  </pre>
                   {guaranteeStatus && (
                     <>
                       <div className="bc-divider" />
                       <h2>Guarantee Status</h2>
-                      <pre className="bc-pre">{JSON.stringify(guaranteeStatus, null, 2)}</pre>
+                      <pre className="bc-pre">
+                        {JSON.stringify(guaranteeStatus, null, 2)}
+                      </pre>
                     </>
                   )}
                 </div>
@@ -317,37 +455,81 @@ export default function App() {
             </div>
           )}
 
-          {tab === 'credit' && (
+          {tab === "credit" && (
             <div className="bc-stack">
               <div className="bc-card">
                 <h2>Credit</h2>
                 <div className="bc-actions">
-                  <button className="bc-btn bc-btnPrimary" onClick={handleGetScore}>Get score</button>
-                  <button className="bc-btn" onClick={handleCheckEligibility}>Check eligibility</button>
-                  <button className="bc-btn" onClick={handleGetLimit}>Get limit</button>
+                  <button
+                    className="bc-btn bc-btnPrimary"
+                    onClick={handleGetScore}
+                  >
+                    Get score
+                  </button>
+                  <button className="bc-btn" onClick={handleCheckEligibility}>
+                    Check eligibility
+                  </button>
+                  <button className="bc-btn" onClick={handleGetLimit}>
+                    Get limit
+                  </button>
                 </div>
                 <div className="bc-grid2 bc-mt12">
                   <label>
                     Amount
-                    <input value={creditRequestInput.amount} onChange={e => setCreditRequestInput(prev => ({ ...prev, amount: e.target.value }))} />
+                    <input
+                      value={creditRequestInput.amount}
+                      onChange={(e) =>
+                        setCreditRequestInput((prev) => ({
+                          ...prev,
+                          amount: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                   <label>
                     Purpose
-                    <input value={creditRequestInput.purpose} onChange={e => setCreditRequestInput(prev => ({ ...prev, purpose: e.target.value }))} />
+                    <input
+                      value={creditRequestInput.purpose}
+                      onChange={(e) =>
+                        setCreditRequestInput((prev) => ({
+                          ...prev,
+                          purpose: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                   <label>
                     Expected return
-                    <input value={creditRequestInput.expectedReturn} onChange={e => setCreditRequestInput(prev => ({ ...prev, expectedReturn: e.target.value }))} />
+                    <input
+                      value={creditRequestInput.expectedReturn}
+                      onChange={(e) =>
+                        setCreditRequestInput((prev) => ({
+                          ...prev,
+                          expectedReturn: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                 </div>
                 <div className="bc-actions bc-mt12">
-                  <button className="bc-btn bc-btnPrimary" onClick={handleCreditRequest}>Request credit</button>
+                  <button
+                    className="bc-btn bc-btnPrimary"
+                    onClick={handleCreditRequest}
+                  >
+                    Request credit
+                  </button>
                 </div>
               </div>
 
               <div className="bc-card">
                 <h2>Results</h2>
-                <pre className="bc-pre">{JSON.stringify({ score, eligibility, limit, creditApproval, repayResult }, null, 2)}</pre>
+                <pre className="bc-pre">
+                  {JSON.stringify(
+                    { score, eligibility, limit, creditApproval, repayResult },
+                    null,
+                    2,
+                  )}
+                </pre>
               </div>
 
               <div className="bc-card">
@@ -355,45 +537,81 @@ export default function App() {
                 <div className="bc-grid2">
                   <label>
                     Credit ID
-                    <input value={repayInput.creditId} onChange={e => setRepayInput(prev => ({ ...prev, creditId: e.target.value }))} />
+                    <input
+                      value={repayInput.creditId}
+                      onChange={(e) =>
+                        setRepayInput((prev) => ({
+                          ...prev,
+                          creditId: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                   <label>
                     Amount
-                    <input value={repayInput.amount} onChange={e => setRepayInput(prev => ({ ...prev, amount: e.target.value }))} />
+                    <input
+                      value={repayInput.amount}
+                      onChange={(e) =>
+                        setRepayInput((prev) => ({
+                          ...prev,
+                          amount: e.target.value,
+                        }))
+                      }
+                    />
                   </label>
                 </div>
                 <div className="bc-actions bc-mt12">
-                  <button className="bc-btn bc-btnPrimary" onClick={handleRepay}>Repay</button>
+                  <button
+                    className="bc-btn bc-btnPrimary"
+                    onClick={handleRepay}
+                  >
+                    Repay
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {tab === 'analytics' && (
+          {tab === "analytics" && (
             <div className="bc-stack">
               <div className="bc-card">
                 <h2>Analytics</h2>
                 <div className="bc-actions">
-                  <button className="bc-btn bc-btnPrimary" onClick={handleAnalyticsHealth}>Get health</button>
-                  <button className="bc-btn" onClick={handleAnalyticsHistory}>History (7d)</button>
-                  <button className="bc-btn" onClick={handleAnalyticsReport}>Report</button>
-                  <button className={monitoring ? 'bc-btn bc-btnDanger' : 'bc-btn'} onClick={handleAnalyticsMonitorToggle}>
-                    {monitoring ? 'Stop monitor' : 'Start monitor'}
+                  <button
+                    className="bc-btn bc-btnPrimary"
+                    onClick={handleAnalyticsHealth}
+                  >
+                    Get health
+                  </button>
+                  <button className="bc-btn" onClick={handleAnalyticsHistory}>
+                    History (7d)
+                  </button>
+                  <button className="bc-btn" onClick={handleAnalyticsReport}>
+                    Report
+                  </button>
+                  <button
+                    className={monitoring ? "bc-btn bc-btnDanger" : "bc-btn"}
+                    onClick={handleAnalyticsMonitorToggle}
+                  >
+                    {monitoring ? "Stop monitor" : "Start monitor"}
                   </button>
                 </div>
                 <div className="bc-divider" />
-                <pre className="bc-pre">{JSON.stringify({ health, history, report }, null, 2)}</pre>
+                <pre className="bc-pre">
+                  {JSON.stringify({ health, history, report }, null, 2)}
+                </pre>
               </div>
             </div>
           )}
 
           <div className="bc-console bc-card">
             <h2>Console</h2>
-            <pre className="bc-pre bc-preConsole">{log || 'No events yet.'}</pre>
+            <pre className="bc-pre bc-preConsole">
+              {log || "No events yet."}
+            </pre>
           </div>
         </section>
       </main>
     </div>
   );
 }
-
