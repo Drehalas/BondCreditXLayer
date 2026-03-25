@@ -1,6 +1,7 @@
 import type {
   BondCreditClientConfig,
   AvailableCredit,
+  X402CancelResult,
   X402GuaranteeRequest,
   X402GuaranteeResponse,
   X402GuaranteeStatus,
@@ -138,13 +139,13 @@ export class X402Client {
     return record.status;
   }
 
-  async cancelGuarantee(guaranteeId: string): Promise<{ ok: true }> {
+  async cancelGuarantee(guaranteeId: string): Promise<X402CancelResult> {
     if (hasGuarantorContract(this.cfg) && isHexString(guaranteeId, 32)) {
       const write = getGuarantorWriteContract(this.cfg);
       if (!write) throw new Error('On-chain x402 mode requires rpcUrl, guarantor address, and privateKey');
       const tx = await write.cancelGuarantee(guaranteeId);
       await tx.wait();
-      return { ok: true };
+      return { ok: true, txHash: tx.hash };
     }
 
     const record = this.guaranteeState.get(guaranteeId);
@@ -152,7 +153,7 @@ export class X402Client {
     record.status.active = false;
     record.status.cancelled = true;
     this.guaranteeState.set(guaranteeId, record);
-    return { ok: true };
+    return { ok: true, txHash: randomHex(32) };
   }
 }
 

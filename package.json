@@ -16,19 +16,26 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "server:build": "tsc -p tsconfig.server.json",
+    "server:typecheck": "tsc -p tsconfig.server.json --noEmit",
+    "server:dev": "tsx server/server.ts",
+    "server:start": "tsx server/server.ts",
     "contract:clean": "hardhat clean",
     "contract:compile": "hardhat compile",
     "contract:test": "hardhat test",
     "contract:deploy:testnet": "hardhat run scripts/deploy.cjs --network xlayerTestnet"
   },
   "dependencies": {
+    "express": "^4.21.2",
     "ethers": "^6.15.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.23",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts": "^5.2.0",
     "dotenv": "^16.6.1",
     "hardhat": "^2.26.3",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }
 }

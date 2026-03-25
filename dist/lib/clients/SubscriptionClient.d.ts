@@ -11,6 +11,6 @@ export declare class SubscriptionClient {
      */
     subscribe(input?: SubscribeInput): Promise<SubscribeResult>;
     checkStatus(): Promise<CheckStatusResult>;
-    renew(): Promise<SubscribeResult>;
+    renew(input?: Pick<SubscribeInput, 'duration'>): Promise<SubscribeResult>;
 }
 //# sourceMappingURL=SubscriptionClient.d.ts.map

@@ -1,3 +1,3 @@
 export { BondCreditClient } from './lib/BondCreditClient.js';
-export type { BondCreditClientConfig, Network, SubscriptionStatus, CreditScore, AvailableCredit, CreditRequest, CreditPosition, Guarantee, AnalyticsEvent, CreditHealth, CreditHistory, AnalyticsSimulateAction, AnalyticsSimulation, AnalyticsReport, AnalyticsMonitorUpdate, MonitorStop, X402GuaranteeRequest, X402GuaranteeResponse, X402GuaranteeStatus } from './lib/types.js';
+export type { BondCreditClientConfig, Network, SubscriptionStatus, CreditScore, AvailableCredit, CreditRequest, CreditPosition, Guarantee, AnalyticsEvent, CreditHealth, CreditHistory, AnalyticsSimulateAction, AnalyticsSimulation, AnalyticsReport, AnalyticsMonitorUpdate, MonitorStop, X402GuaranteeRequest, X402GuaranteeResponse, X402GuaranteeStatus, X402CancelResult, CreditApproval, CreditLimit, Eligibility } from './lib/types.js';
 //# sourceMappingURL=index.d.ts.map

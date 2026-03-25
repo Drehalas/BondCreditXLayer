@@ -19,8 +19,9 @@ export type {
   X402GuaranteeRequest,
   X402GuaranteeResponse,
   X402GuaranteeStatus,
+  X402CancelResult,
   CreditApproval,
-   CreditLimit,
+  CreditLimit,
   Eligibility
 } from './lib/types.js';
 

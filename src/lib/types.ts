@@ -225,3 +225,8 @@ export type X402GuaranteeStatus = {
   expiresIn: string;
 };
 
+export type X402CancelResult = {
+  ok: true;
+  txHash: string;
+};
+

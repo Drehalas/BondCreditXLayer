@@ -101,7 +101,7 @@ export class X402Client {
                 throw new Error('On-chain x402 mode requires rpcUrl, guarantor address, and privateKey');
             const tx = await write.cancelGuarantee(guaranteeId);
             await tx.wait();
-            return { ok: true };
+            return { ok: true, txHash: tx.hash };
         }
         const record = this.guaranteeState.get(guaranteeId);
         if (!record)
@@ -109,7 +109,7 @@ export class X402Client {
         record.status.active = false;
         record.status.cancelled = true;
         this.guaranteeState.set(guaranteeId, record);
-        return { ok: true };
+        return { ok: true, txHash: randomHex(32) };
     }
 }
 //# sourceMappingURL=X402Client.js.map

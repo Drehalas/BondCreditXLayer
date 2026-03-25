@@ -1,4 +1,4 @@
-import type { BondCreditClientConfig, AvailableCredit, X402GuaranteeRequest, X402GuaranteeResponse, X402GuaranteeStatus } from '../types.js';
+import type { BondCreditClientConfig, AvailableCredit, X402CancelResult, X402GuaranteeRequest, X402GuaranteeResponse, X402GuaranteeStatus } from '../types.js';
 type SubscriptionLike = {
     check(): Promise<{
         active: boolean;
@@ -21,9 +21,7 @@ export declare class X402Client {
     });
     guaranteePayment(input: X402GuaranteeRequest): Promise<X402GuaranteeResponse>;
     checkGuarantee(guaranteeId: string): Promise<X402GuaranteeStatus>;
-    cancelGuarantee(guaranteeId: string): Promise<{
-        ok: true;
-    }>;
+    cancelGuarantee(guaranteeId: string): Promise<X402CancelResult>;
 }
 export {};
 //# sourceMappingURL=X402Client.d.ts.map

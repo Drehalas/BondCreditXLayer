@@ -218,4 +218,8 @@ export type X402GuaranteeStatus = {
     cancelled?: boolean;
     expiresIn: string;
 };
+export type X402CancelResult = {
+    ok: true;
+    txHash: string;
+};
 //# sourceMappingURL=types.d.ts.map

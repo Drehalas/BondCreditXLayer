@@ -109,6 +109,7 @@ export default function App() {
   async function handleSubscribe() {
     const res = await client.subscription.subscribe({ duration, autoRenew });
     appendLog(`subscribe(): ${JSON.stringify(res, null, 2)}`);
+    appendLog(`subscribe txHash: ${res.txHash}`);
   }
 
   async function handleCheckStatus() {
@@ -118,14 +119,16 @@ export default function App() {
   }
 
   async function handleRenew() {
-    const res = await client.subscription.renew();
+    const res = await client.subscription.renew({ duration });
     appendLog(`renew(): ${JSON.stringify(res, null, 2)}`);
+    appendLog(`renew txHash: ${res.txHash}`);
   }
 
   async function handleGuarantee() {
     const res = await client.x402.guaranteePayment(x402Input);
     setGuarantee(res);
     appendLog(`guaranteePayment(): ${JSON.stringify(res, null, 2)}`);
+    appendLog(`guaranteePayment txHash: ${res.proof}`);
   }
 
   async function handleCheckGuarantee() {
@@ -137,8 +140,9 @@ export default function App() {
 
   async function handleCancelGuarantee() {
     if (!guarantee) return;
-    await client.x402.cancelGuarantee(guarantee.guaranteeId);
-    appendLog(`cancelGuarantee(): ok`);
+    const res = await client.x402.cancelGuarantee(guarantee.guaranteeId);
+    appendLog(`cancelGuarantee(): ${JSON.stringify(res, null, 2)}`);
+    appendLog(`cancelGuarantee txHash: ${res.txHash}`);
     setGuaranteeStatus(await client.x402.checkGuarantee(guarantee.guaranteeId));
   }
 

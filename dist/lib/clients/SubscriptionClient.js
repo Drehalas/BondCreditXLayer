@@ -79,14 +79,14 @@ export class SubscriptionClient {
             paymentsMade: this.paymentsMade
         };
     }
-    async renew() {
+    async renew(input = {}) {
         if (hasSubscriptionContract(this.cfg)) {
             const read = getSubscriptionReadContract(this.cfg);
             const write = getSubscriptionWriteContract(this.cfg);
             if (!read || !write) {
                 throw new Error('On-chain renew requires rpcUrl, contract address, and privateKey');
             }
-            const days = 30;
+            const days = daysFromDuration(input.duration ?? '30 days');
             const pricePerDayWei = (await read.pricePerDayWei());
             const total = pricePerDayWei * BigInt(days);
             const tx = await write.renew(days, { value: total });
@@ -99,8 +99,8 @@ export class SubscriptionClient {
                 amount: formatWeiAmount(total)
             };
         }
-        // Scaffold fallback: renew for 30 days from now.
-        return this.subscribe({ duration: '30 days', autoRenew: true });
+        // Scaffold fallback: renew for selected duration (defaults to 30 days).
+        return this.subscribe({ duration: input.duration ?? '30 days', autoRenew: true });
     }
 }
 //# sourceMappingURL=SubscriptionClient.js.map
