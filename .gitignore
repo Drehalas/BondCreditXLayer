@@ -1,2 +1,15 @@
-node_modules
+node_modules/
+.cursor/
+package-lock.json
+.env
+.env.example
 .env.local
+*.log
+frontend/dist/
+frontend/node_modules/
+frontend/package-lock.json
+frontend/.env
+frontend/.env.example
+frontend/.env.local
+frontend/*.log
+frontend/dist

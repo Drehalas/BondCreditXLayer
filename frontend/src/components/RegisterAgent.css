@@ -1,0 +1,253 @@
+.register-agent-page {
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  color: var(--bondcredit-white);
+  min-height: 100vh;
+}
+
+.register-container {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.back-button {
+  background: transparent;
+  border: none;
+  color: var(--bondcredit-s2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+  width: fit-content;
+}
+
+.back-button:hover {
+  color: var(--bondcredit-white);
+}
+
+.register-header {
+  text-align: left;
+}
+
+.register-header h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  margin: 8px 0 16px;
+  letter-spacing: -0.03em;
+}
+
+.register-header .kicker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--bondcredit-lime);
+  letter-spacing: 0.1em;
+}
+
+.register-header .subtitle {
+  font-size: 1.125rem;
+  color: var(--bondcredit-s2);
+  max-width: 600px;
+}
+
+/* Steps Grid */
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.step-card {
+  background: var(--bondcredit-bg2);
+  border: 1px solid var(--bondcredit-border);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.step-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.step-number {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.875rem;
+  color: var(--bondcredit-lime);
+  font-weight: 700;
+}
+
+.step-card h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.step-card p {
+  font-size: 0.9375rem;
+  color: var(--bondcredit-s1);
+  line-height: 1.6;
+}
+
+.step-card code {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8125rem;
+}
+
+/* Code Snippet Area */
+.code-snippet {
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.code-snippet pre {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #ccc;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Requirements List */
+.requirements-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.requirements-list li {
+  font-size: 0.875rem;
+  color: var(--bondcredit-s1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.requirements-list li::before {
+  content: "→";
+  color: var(--bondcredit-lime);
+}
+
+/* File Tree */
+.file-tree {
+  background: #111;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8125rem;
+  color: #888;
+}
+
+.tree-item.highlight {
+  color: var(--bondcredit-green);
+  font-weight: 600;
+}
+
+/* Status Badge */
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.1);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--bondcredit-green);
+  font-weight: 600;
+  margin-top: auto;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--bondcredit-green);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--bondcredit-green);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* Footer Section */
+.register-footer {
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--bondcredit-border);
+  padding-top: 40px;
+}
+
+.help-box h4 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.help-box p {
+  color: var(--bondcredit-s2);
+  font-size: 0.875rem;
+}
+
+.help-box a {
+  color: var(--bondcredit-lime);
+  text-decoration: none;
+}
+
+.help-box a:hover {
+  text-decoration: underline;
+}
+
+.primary-cta {
+  background: var(--bondcredit-lime);
+  color: var(--bondcredit-bg);
+  border: none;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.primary-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(188, 237, 98, 0.25);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .register-header h1 {
+    font-size: 2.25rem;
+  }
+  .register-footer {
+    flex-direction: column;
+    gap: 24px;
+    align-items: flex-start;
+  }
+}
