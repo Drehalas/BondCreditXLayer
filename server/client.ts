@@ -3,10 +3,10 @@ import type { BondCreditClientConfig } from '../src/index.js';
 
 const DEFAULT_SUBSCRIPTION_MANAGER =
   process.env.BONDCREDIT_SUBSCRIPTION_MANAGER ??
-  '0x963dceE3ee2861f8c32E9d727aaA2bFE934D0E7c';
+  '0xAEA215B9F67E0d87B9B89828A1F2dE365Ef1EAd5';
 const DEFAULT_PAYMENT_GUARANTOR =
   process.env.BONDCREDIT_PAYMENT_GUARANTOR ??
-  '0x45565b125Dc284330d5fB4f85530346Adc3B2751';
+  '0x137bee465E12A5F82e051ec2185F2477a32c4f70';
 
 export function createClient(agentId: string): BondCreditClient {
   const config: BondCreditClientConfig = {

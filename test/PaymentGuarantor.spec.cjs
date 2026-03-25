@@ -39,7 +39,29 @@ describe('PaymentGuarantor', function () {
     expect(status.used).to.equal(false);
   });
 
-  it('marks used then repays', async function () {
+  it('settles to recipient then repays', async function () {
+    const { admin, agent, recipient, guarantor } = await setup();
+
+    const amount = ethers.parseEther('0.1');
+    const ttl = 10 * 60;
+
+    const id = await guarantor.connect(agent).createGuarantee.staticCall(recipient.address, amount, ttl);
+    await guarantor.connect(agent).createGuarantee(recipient.address, amount, ttl);
+
+    const payloadHash = ethers.keccak256(ethers.toUtf8Bytes('x402-payload'));
+    const recipientBefore = await ethers.provider.getBalance(recipient.address);
+    await guarantor.connect(admin).settleGuarantee(id, payloadHash);
+    const recipientAfter = await ethers.provider.getBalance(recipient.address);
+    expect(recipientAfter - recipientBefore).to.equal(amount);
+
+    const fee = (amount * 50n) / 10_000n;
+    await guarantor.connect(agent).repayGuarantee(id, { value: amount + fee });
+
+    const status = await guarantor.checkGuarantee(id);
+    expect(status.repaid).to.equal(true);
+  });
+
+  it('still supports mark-used path then repays', async function () {
     const { admin, agent, recipient, guarantor } = await setup();
 
     const amount = ethers.parseEther('0.1');

@@ -22,8 +22,8 @@ function initialClientConfig(): Omit<BondCreditClientConfig, never> {
     privateKey: import.meta.env.VITE_DEPLOYER_PRIVATE_KEY || "",
     rpcUrl: "https://testrpc.xlayer.tech",
     contracts: {
-      subscriptionManager: "0x963dceE3ee2861f8c32E9d727aaA2bFE934D0E7c",
-      paymentGuarantor: "0x45565b125Dc284330d5fB4f85530346Adc3B2751",
+      subscriptionManager: "0xAEA215B9F67E0d87B9B89828A1F2dE365Ef1EAd5",
+      paymentGuarantor: "0x137bee465E12A5F82e051ec2185F2477a32c4f70",
     },
   };
 }

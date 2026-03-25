@@ -22,6 +22,7 @@ contract PaymentGuarantor is AccessControl, Pausable, ReentrancyGuard {
     error RepayValueTooLow();
     error WithdrawalExceedsFreeLiquidity();
     error RefundFailed();
+    error SettlementFailed();
 
     bytes32 public constant VERIFIER_ROLE = keccak256('VERIFIER_ROLE');
     bytes32 public constant TREASURY_ROLE = keccak256('TREASURY_ROLE');
@@ -37,6 +38,7 @@ contract PaymentGuarantor is AccessControl, Pausable, ReentrancyGuard {
         bool used;
         bool cancelled;
         bool repaid;
+        bool paidOut;
         bytes32 x402PayloadHash;
     }
 
@@ -52,6 +54,13 @@ contract PaymentGuarantor is AccessControl, Pausable, ReentrancyGuard {
     );
     event GuaranteeCancelled(bytes32 indexed guaranteeId, address indexed cancelledBy);
     event GuaranteeUsed(bytes32 indexed guaranteeId, bytes32 indexed x402PayloadHash, address indexed verifier);
+    event GuaranteeSettled(
+        bytes32 indexed guaranteeId,
+        bytes32 indexed x402PayloadHash,
+        address indexed verifier,
+        address recipient,
+        uint256 amountWei
+    );
     event GuaranteeRepaid(bytes32 indexed guaranteeId, address indexed payer, uint256 paidWei);
 
     ISubscriptionManager public immutable subscriptionManager;
@@ -135,6 +144,7 @@ contract PaymentGuarantor is AccessControl, Pausable, ReentrancyGuard {
             used: false,
             cancelled: false,
             repaid: false,
+            paidOut: false,
             x402PayloadHash: bytes32(0)
         });
 
@@ -181,6 +191,32 @@ contract PaymentGuarantor is AccessControl, Pausable, ReentrancyGuard {
         emit GuaranteeUsed(guaranteeId, x402PayloadHash, msg.sender);
     }
 
+    function settleGuarantee(bytes32 guaranteeId, bytes32 x402PayloadHash)
+        external
+        whenNotPaused
+        nonReentrant
+        onlyRole(VERIFIER_ROLE)
+    {
+        Guarantee storage g = guarantees[guaranteeId];
+        if (g.agent == address(0)) revert GuaranteeNotFound();
+        if (!g.active) revert GuaranteeInactive();
+        if (g.expiresAt <= block.timestamp) revert GuaranteeExpired();
+
+        g.active = false;
+        g.used = true;
+        g.paidOut = true;
+        g.x402PayloadHash = x402PayloadHash;
+
+        // Release reservation because principal has now left the pool.
+        outstandingByAgent[g.agent] -= g.amountWei;
+        totalOutstandingWei -= g.amountWei;
+
+        (bool ok,) = payable(g.recipient).call{value: g.amountWei}("");
+        if (!ok) revert SettlementFailed();
+
+        emit GuaranteeSettled(guaranteeId, x402PayloadHash, msg.sender, g.recipient, g.amountWei);
+    }
+
     function repayGuarantee(bytes32 guaranteeId)
         external
         payable
@@ -197,8 +233,10 @@ contract PaymentGuarantor is AccessControl, Pausable, ReentrancyGuard {
 
         g.repaid = true;
 
-        outstandingByAgent[g.agent] -= g.amountWei;
-        totalOutstandingWei -= g.amountWei;
+        if (!g.paidOut) {
+            outstandingByAgent[g.agent] -= g.amountWei;
+            totalOutstandingWei -= g.amountWei;
+        }
 
         uint256 refund = msg.value - required;
         if (refund > 0) {
