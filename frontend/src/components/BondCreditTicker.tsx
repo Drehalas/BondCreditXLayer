@@ -40,10 +40,11 @@ const BondCreditTicker: React.FC = () => {
     { symbol: 'GIZA', price: '0.0179', change: '0.53', isPositive: true },
   ];
 
+  // Duplicate items for seamless loop
   const displayItems = [...items, ...items, ...items, ...items];
 
   return (
-    <div className="ticker-wrap overflow-hidden" style={{ height: '32px', background: 'var(--bondcredit-bg)', borderBottom: '1px solid var(--bondcredit-border)', position: 'fixed', top: '48px', left: 0, right: 0, display: 'flex', alignItems: 'center', zIndex: 40 }}>
+    <div className="ticker-wrap overflow-hidden" style={{ height: '32px', background: 'var(--bondcredit-bg)', borderBottom: '1px solid var(--bondcredit-border)', marginTop: '48px', display: 'flex', alignItems: 'center', zIndex: 40, position: 'relative' }}>
       <div className="animate-scroll flex whitespace-nowrap items-center h-full">
         {displayItems.map((item, idx) => (
           <TickerItem key={idx} {...item} />
