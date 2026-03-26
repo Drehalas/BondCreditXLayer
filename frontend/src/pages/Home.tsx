@@ -21,15 +21,24 @@ const Section: React.FC<{ children: React.ReactNode; className?: string; id?: st
 const Home: React.FC = () => {
   return (
     <div className="home-root" style={{ background: 'var(--bondcredit-bg)', color: 'var(--bondcredit-white)' }}>
-      {/* Hero Section */}
-      <Section className="hero-section" style={{ paddingTop: '120px' }}>
+      <Section 
+        className="hero-section" 
+        style={{ 
+          paddingTop: '160px', 
+          paddingBottom: '120px',
+          background: 'linear-gradient(rgba(13, 15, 20, 0.4), rgba(13, 15, 20, 0.9)), url("/hero/bondhero.jpg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          position: 'relative'
+        }}
+      >
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          style={{ fontSize: 'clamp(3rem, 10vw, 5.5rem)', fontWeight: 900, lineHeight: 1.05, marginBottom: '24px', letterSpacing: '-0.02em' }}
+          style={{ fontSize: 'clamp(3rem, 10vw, 5rem)', fontWeight: 900, lineHeight: 1.05, marginBottom: '24px', letterSpacing: '-0.02em' }}
         >
-          Quantifiable <span style={{ color: 'var(--bondcredit-green)', textShadow: '0 0 40px rgba(59, 247, 210, 0.3)' }}>Trust</span><br />
+          Trust and <span style={{ color: 'var(--bondcredit-green)', textShadow: '0 0 40px rgba(59, 247, 210, 0.3)' }}>Credit</span><br />
           <span style={{ fontSize: '0.8em', fontWeight: 700, opacity: 0.9 }}>for the Agentic Economy</span>
         </motion.h1>
         <motion.p 
@@ -46,8 +55,8 @@ const Home: React.FC = () => {
           transition={{ duration: 0.5, delay: 0.8 }}
           style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}
         >
-          <Link to="/subscribe" className="bc-btn bc-btnPrimary" style={{ padding: '16px 40px', fontSize: '1.125rem', fontWeight: 600, borderRadius: '14px' }}>Get Started</Link>
-          <a href="#x402" className="bc-btn" style={{ padding: '16px 40px', fontSize: '1.125rem', fontWeight: 600, borderRadius: '14px' }}>Explore Protocols</a>
+          <Link to="/subscribe" className="bc-btn bc-btnPrimary" style={{ padding: '16px 48px', fontSize: '1.125rem', fontWeight: 600, borderRadius: '14px' }}>Subscribe</Link>
+          <a href="#x402" className="bc-btn" style={{ padding: '16px 48px', fontSize: '1.125rem', fontWeight: 600, borderRadius: '14px' }}>Explore Protocols</a>
         </motion.div>
       </Section>
 
@@ -60,7 +69,7 @@ const Home: React.FC = () => {
             <p style={{ color: 'var(--bondcredit-s2)', fontSize: '1.125rem', marginBottom: '40px', lineHeight: 1.7 }}>
               Integrate your agents with the XLayer ecosystem in minutes. Our SDK handles everything from identity verification to automated subscription management.
             </p>
-            <Link to="/subscribe" className="bc-btn bc-btnPrimary" style={{ padding: '12px 28px' }}>Start Subscription</Link>
+            <Link to="/subscribe" className="bc-btn bc-btnPrimary" style={{ padding: '12px 28px' }}>Subscribe</Link>
           </div>
           <div className="bc-card" style={{ padding: '0', background: '#000', border: '1px solid rgba(59, 247, 210, 0.1)', boxShadow: '0 0 100px rgba(59, 247, 210, 0.05)' }}>
              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '8px' }}>
@@ -131,9 +140,9 @@ const Home: React.FC = () => {
             <div style={{ color: 'var(--bondcredit-green)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px', fontSize: '0.875rem' }}>Phase 03: Intelligence</div>
             <h2 style={{ fontSize: '3rem', marginBottom: '24px', fontWeight: 800, lineHeight: 1.1 }}>Quantifiable <br /><span style={{ color: 'var(--bondcredit-green)' }}>Trust</span></h2>
             <p style={{ color: 'var(--bondcredit-s2)', fontSize: '1.125rem', marginBottom: '40px', lineHeight: 1.7 }}>
-              Our proprietary Credit Intelligence layer monitors agent reliability, transaction history, and reasoning consistency to establish a robust decentralized credit score.
+              Our Agentic Credit Engine analyses agent behavior history onchain to provide real-time credit scores and credit lines.
             </p>
-            <Link to="/credit" className="bc-btn bc-btnPrimary" style={{ padding: '12px 28px' }}>Manage Agent Credit</Link>
+            <Link to="/subscribe" className="bc-btn bc-btnPrimary" style={{ padding: '12px 28px' }}>Subscribe</Link>
           </div>
         </div>
       </Section>
@@ -145,7 +154,7 @@ const Home: React.FC = () => {
         <p style={{ color: 'var(--bondcredit-s2)', fontSize: '1.125rem', marginBottom: '56px', maxWidth: '750px', margin: '0 auto 56px', lineHeight: 1.7 }}>
           Gain deep visibility into your agent fleet. Track performance metrics, health status, and cross-chain interaction traces with our enterprise-grade analytics engine.
         </p>
-        <Link to="/analytics" className="bc-btn bc-btnPrimary" style={{ padding: '16px 40px', fontSize: '1.125rem' }}>Open Analytics Terminal</Link>
+        <Link to="/subscribe" className="bc-btn bc-btnPrimary" style={{ padding: '16px 40px', fontSize: '1.125rem' }}>Subscribe</Link>
       </Section>
     </div>
   );
