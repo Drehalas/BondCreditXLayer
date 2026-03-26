@@ -9,6 +9,25 @@ interface BondCreditHeaderProps {
 const BondCreditHeader: React.FC<BondCreditHeaderProps> = ({ connected, onRegisterClick }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  const navPages = [
+    { href: '/subscribe', label: 'Subscribe' },
+    { href: '/guarantee', label: 'Guarantee' },
+    { href: '/credit', label: 'Credit' },
+    { href: '/analytics', label: 'Analytics' },
+  ];
+
+  const navLinkStyle = {
+    color: 'var(--bondcredit-s2)',
+    background: 'transparent',
+    border: 'none',
+    padding: '0.5rem 0.75rem',
+    borderRadius: '0.375rem',
+    textDecoration: 'none',
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    transition: 'color 0.2s ease',
+  };
+
   return (
     <nav className="wt-nav" style={{ background: 'var(--bondcredit-bg2)', borderBottom: '1px solid var(--bondcredit-border)', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, transition: 'transform 0.3s ease' }}>
       <div className="wt-container w-full flex items-center justify-between" style={{ height: '48px' }}>
@@ -36,93 +55,40 @@ const BondCreditHeader: React.FC<BondCreditHeaderProps> = ({ connected, onRegist
           </span>
         </a>
 
-        {/* Desktop Navigation */}
+        {/* Desktop Navigation - All Pages */}
         <div className="hidden lg:flex items-center gap-1">
-          <a
-            href="/"
-            className="nav-link active flex items-center gap-1.5"
-            style={{ background: 'var(--bondcredit-card2)' }}
-          >
-            XLayer Testnet
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: 'var(--bondcredit-green)',
-                display: 'inline-block',
-                boxShadow: '0 0 6px var(--bondcredit-green)'
-              }}
-            />
-          </a>
+          {navPages.map(page => (
+            <a
+              key={page.href}
+              href={page.href}
+              className="text-xs font-medium transition-colors hover:text-bondcredit-white focus-ring"
+              style={navLinkStyle}
+            >
+              {page.label}
+            </a>
+          ))}
         </div>
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-3">
-          <div className="hidden lg:flex items-center gap-4">
-            <button
-              className="text-xs font-medium transition-colors hover:text-bondcredit-white cursor-pointer focus-ring"
-              style={{
-                color: 'var(--bondcredit-s2)',
-                background: 'transparent',
-                border: 'none',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.375rem'
-              }}
-              onClick={onRegisterClick}
-            >
-              Register Agent
-            </button>
+          <div className="hidden lg:flex items-center gap-2">
             <a
-              href="/.well-known/skills/default/SKILL.md"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/skill"
               className="text-xs font-medium transition-colors hover:text-bondcredit-white focus-ring"
-              style={{
-                color: 'var(--bondcredit-s2)',
-                background: 'transparent',
-                border: 'none',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.375rem',
-                textDecoration: 'none'
-              }}
+              style={navLinkStyle}
             >
-              Agents
+              Download SKILL.md
             </a>
             <a
               href="https://x.com/bondoncredit?s=21"
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs font-medium transition-colors hover:text-bondcredit-white focus-ring"
-              style={{
-                color: 'var(--bondcredit-s2)',
-                background: 'transparent',
-                border: 'none',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.375rem',
-                textDecoration: 'none'
-              }}
+              style={navLinkStyle}
             >
               X ↗
             </a>
           </div>
-
-          <button
-            className="btn-lime text-xs cursor-pointer focus-ring hover:opacity-90"
-            style={{
-              padding: '6px 14px',
-              opacity: 1,
-              transition: 'all 0.2s ease',
-              pointerEvents: 'auto',
-              border: 'none',
-              borderRadius: '0.375rem',
-              fontWeight: 600
-            }}
-          >
-            CONNECT
-          </button>
-
-
 
           <button
             className="lg:hidden flex items-center justify-center cursor-pointer focus-ring hover:bg-bondcredit-card2"
@@ -153,28 +119,28 @@ const BondCreditHeader: React.FC<BondCreditHeaderProps> = ({ connected, onRegist
         <motion.div
           className="lg:hidden border-t border-bondcredit-border bg-bondcredit-bg2"
           initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 52 }}
+          animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.25, ease: 'easeInOut' }}
           style={{ overflow: 'hidden' }}
         >
           <div className="flex flex-col gap-1 py-3 px-4">
+            {navPages.map(page => (
+              <a
+                key={page.href}
+                href={page.href}
+                className="nav-link text-sm"
+                style={{ color: 'var(--bondcredit-s2)', padding: '8px 12px', textDecoration: 'none' }}
+              >
+                {page.label}
+              </a>
+            ))}
             <a
-              href="/"
-              className="nav-link text-sm flex items-center gap-1.5"
-              style={{ color: 'var(--bondcredit-white)', background: 'var(--bondcredit-card2)' }}
+              href="/skill"
+              className="nav-link text-sm"
+              style={{ color: 'var(--bondcredit-s2)', padding: '8px 12px', textDecoration: 'none' }}
             >
-              LIVE
-              <span
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: 'var(--bondcredit-green)',
-                  display: 'inline-block',
-                  boxShadow: '0 0 6px var(--bondcredit-green)'
-                }}
-              />
+              Download SKILL.md
             </a>
           </div>
         </motion.div>

@@ -47,7 +47,7 @@ const Home: React.FC = () => {
           transition={{ duration: 1, delay: 0.5 }}
           style={{ fontSize: '1.25rem', color: 'var(--bondcredit-s2)', maxWidth: '650px', margin: '0 auto 48px', lineHeight: 1.6 }}
         >
-          The first Credit Intelligence Layer built specifically for autonomous agents on XLayer. Seamless subscriptions, payment delegation, and real-time credit scoring.
+          Our Agentic Credit Engine analyses agent behavior history onchain to provide real-time credit scores and credit lines.
         </motion.p>
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -100,7 +100,8 @@ const Home: React.FC = () => {
           <p style={{ color: 'var(--bondcredit-s2)', fontSize: '1.125rem', marginBottom: '56px', maxWidth: '700px', margin: '0 auto 56px', lineHeight: 1.7 }}>
             Empower your agents to transact autonomously. x402 is a secure delegation protocol that allows agents to consume services and settle payments on-chain without manual intervention.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '32px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '48px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '32px', width: '100%' }}>
             <div className="bc-card" style={{ padding: '32px', textAlign: 'left' }}>
               <div style={{ color: 'var(--bondcredit-green)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '16px', opacity: 0.5 }}>01</div>
               <h3 style={{ marginBottom: '12px', fontSize: '1.25rem' }}>Initiate</h3>
@@ -117,7 +118,8 @@ const Home: React.FC = () => {
               <p style={{ fontSize: '0.9375rem', color: 'var(--bondcredit-s2)', lineHeight: 1.6 }}>The service is rendered and settlement happens automatically via x402.</p>
             </div>
           </div>
-          <Link to="/guarantee" className="bc-btn bc-btnPrimary" style={{ marginTop: '56px', padding: '14px 36px' }}>Explore Delegate Protocol</Link>
+          <Link to="/guarantee" className="bc-btn bc-btnPrimary" style={{ padding: '14px 36px' }}>Explore Delegate Protocol</Link>
+          </div>
         </div>
       </Section>
 

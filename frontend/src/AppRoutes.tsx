@@ -5,17 +5,17 @@ import SubscribePage from './pages/SubscribePage';
 import GuaranteePage from './pages/GuaranteePage';
 import CreditPage from './pages/CreditPage';
 import AnalyticsPage from './pages/AnalyticsPage';
-
-import DashboardLayout from './components/layout/DashboardLayout';
+import SkillPage from './pages/SkillPage';
 
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/subscribe" element={<DashboardLayout><SubscribePage /></DashboardLayout>} />
-      <Route path="/guarantee" element={<DashboardLayout><GuaranteePage /></DashboardLayout>} />
-      <Route path="/credit" element={<DashboardLayout><CreditPage /></DashboardLayout>} />
-      <Route path="/analytics" element={<DashboardLayout><AnalyticsPage /></DashboardLayout>} />
+      <Route path="/subscribe" element={<SubscribePage />} />
+      <Route path="/guarantee" element={<GuaranteePage />} />
+      <Route path="/credit" element={<CreditPage />} />
+      <Route path="/analytics" element={<AnalyticsPage />} />
+      <Route path="/skill" element={<SkillPage />} />
     </Routes>
   );
 };

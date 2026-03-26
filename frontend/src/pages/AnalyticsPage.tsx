@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useBondCredit } from '../context/BondCreditContext';
-import DashboardLayout from '../components/layout/DashboardLayout';
 import type { CreditHealth, CreditHistory, AnalyticsReport, AnalyticsMonitorUpdate } from '../../../src/index';
+import MachineReadableSection from '../components/MachineReadableSection';
 
 const AnalyticsPage: React.FC = () => {
   const { client, log, appendLog } = useBondCredit();
@@ -45,28 +45,43 @@ const AnalyticsPage: React.FC = () => {
   }
 
   return (
-    <DashboardLayout>
-      <div className="bc-stack">
-        <section className="bc-card">
-          <h2>Analytics Dashboard</h2>
-          <div className="bc-actions">
-            <button className="bc-btn bc-btnPrimary" onClick={handleAnalyticsHealth}>Get health</button>
-            <button className="bc-btn" onClick={handleAnalyticsHistory}>History (7d)</button>
-            <button className="bc-btn" onClick={handleAnalyticsReport}>Report</button>
-            <button className={monitoring ? 'bc-btn bc-btnDanger' : 'bc-btn'} onClick={handleAnalyticsMonitorToggle}>
-              {monitoring ? 'Stop monitor' : 'Start monitor'}
-            </button>
-          </div>
-          <div className="bc-divider" />
-          <pre className="bc-pre">{JSON.stringify({ health, history, report }, null, 2)}</pre>
-        </section>
-
-        <div className="bc-console bc-card">
-          <h2>Console</h2>
-          <pre className="bc-pre bc-preConsole">{log || 'No events yet.'}</pre>
+    <main className="wt-container" style={{ marginTop: '88px', maxWidth: '900px' }}>
+    <div className="bc-stack">
+      <section className="bc-card">
+        <h2>Analytics Dashboard</h2>
+        <div className="bc-actions">
+          <button className="bc-btn bc-btnPrimary" onClick={handleAnalyticsHealth}>Get health</button>
+          <button className="bc-btn" onClick={handleAnalyticsHistory}>History (7d)</button>
+          <button className="bc-btn" onClick={handleAnalyticsReport}>Report</button>
+          <button className={monitoring ? 'bc-btn bc-btnDanger' : 'bc-btn'} onClick={handleAnalyticsMonitorToggle}>
+            {monitoring ? 'Stop monitor' : 'Start monitor'}
+          </button>
         </div>
+        <div className="bc-divider" />
+        <pre className="bc-pre">{JSON.stringify({ health, history, report }, null, 2)}</pre>
+      </section>
+
+      <div className="bc-console bc-card">
+        <h2>Console</h2>
+        <pre className="bc-pre bc-preConsole">{log || 'No events yet.'}</pre>
       </div>
-    </DashboardLayout>
+
+      <MachineReadableSection 
+        title="Machine Readable"
+        description="This page exposes analytics, risk Assessment, and vault rebalancing capabilities for Agents."
+        codeSnippet={`# Analytics: Get Volatility
+GET /volatility {}
+
+# Risk: Assess Risk Score
+POST /risk-score
+{ "agentId": "string" }
+
+# Vault: Rebalance Vault
+POST /rebalance
+{ "vaultId": "string" }`}
+      />
+    </div>
+    </main>
   );
 };
 
