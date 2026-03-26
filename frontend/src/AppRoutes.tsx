@@ -6,6 +6,7 @@ import GuaranteePage from './pages/GuaranteePage';
 import CreditPage from './pages/CreditPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SkillPage from './pages/SkillPage';
+import CreatePage from './pages/CreatePage';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -16,6 +17,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/credit" element={<CreditPage />} />
       <Route path="/analytics" element={<AnalyticsPage />} />
       <Route path="/skill" element={<SkillPage />} />
+      <Route path="/create" element={<CreatePage />} />
     </Routes>
   );
 };

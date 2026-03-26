@@ -1,0 +1,513 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
+
+/* ─── Types ─── */
+interface AgentFormData {
+  email: string;
+  agentName: string;
+  description: string;
+  agentType: string;
+  serviceUrl: string;
+  tools: string;
+  subscriptionTier: string;
+}
+
+const AGENT_TYPES = [
+  { id: 'stablecoin', label: 'Stablecoin Strategy', icon: '🪙', desc: 'Yield optimization and stablecoin management' },
+  { id: 'perpetual', label: 'Perpetual Trader', icon: '📈', desc: 'Leverage trading and position management' },
+  { id: 'prediction', label: 'Prediction Market', icon: '🔮', desc: 'Event-driven prediction market trading' },
+  { id: 'other', label: 'Other', icon: '⚙️', desc: 'Custom agent type or multi-strategy' },
+];
+
+const STEPS = [
+  { num: 1, label: 'Wallet' },
+  { num: 2, label: 'Agent Info' },
+  { num: 3, label: 'Subscribe' },
+  { num: 4, label: 'Dashboard' },
+];
+
+/* ─── Stepper ─── */
+const Stepper: React.FC<{ current: number }> = ({ current }) => (
+  <div className="create-stepper">
+    {STEPS.map((step, i) => {
+      const isActive = step.num === current;
+      const isDone = step.num < current;
+      return (
+        <React.Fragment key={step.num}>
+          {i > 0 && (
+            <div
+              className="create-stepper__line"
+              style={{ background: isDone ? 'var(--bondcredit-green)' : 'var(--bondcredit-border)' }}
+            />
+          )}
+          <div className={`create-stepper__step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
+            <div className="create-stepper__circle">
+              {isDone ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+              ) : (
+                step.num
+              )}
+            </div>
+            <span className="create-stepper__label">{step.label}</span>
+          </div>
+        </React.Fragment>
+      );
+    })}
+  </div>
+);
+
+/* ─── Slide Animations ─── */
+const slideVariants = {
+  enter: (dir: number) => ({ x: dir > 0 ? 80 : -80, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir > 0 ? -80 : 80, opacity: 0 }),
+};
+
+/* ─── Main Component ─── */
+const CreatePage: React.FC = () => {
+  const [step, setStep] = useState(1);
+  const [dir, setDir] = useState(1);
+  const [form, setForm] = useState<AgentFormData>({
+    email: '',
+    agentName: '',
+    description: '',
+    agentType: '',
+    serviceUrl: '',
+    tools: '',
+    subscriptionTier: 'pro',
+  });
+
+  const next = () => { setDir(1); setStep(s => Math.min(s + 1, 4)); };
+  const back = () => { setDir(-1); setStep(s => Math.max(s - 1, 1)); };
+  const update = (field: keyof AgentFormData, val: string) => setForm(f => ({ ...f, [field]: val }));
+
+  return (
+    <main className="create-page wt-container" style={{ marginTop: '88px', paddingBottom: '80px' }}>
+      {/* Title */}
+      <motion.div
+        className="create-page__header"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="create-page__icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--bondcredit-green)" strokeWidth="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="4" />
+            <circle cx="12" cy="10" r="3" />
+            <path d="M7 20c0-3 2.5-5 5-5s5 2 5 5" />
+          </svg>
+        </div>
+        <h1 className="create-page__title">Create Agent</h1>
+        <p className="create-page__subtitle">
+          Register your autonomous agent on the BondCredit XLayer network
+        </p>
+      </motion.div>
+
+      {/* Stepper */}
+      <Stepper current={step} />
+
+      {/* Slides */}
+      <div className="create-page__body">
+        <AnimatePresence mode="wait" custom={dir}>
+          {step === 1 && (
+            <motion.div
+              key="step1"
+              custom={dir}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.35, ease: 'easeInOut' }}
+            >
+              <Step1 form={form} update={update} onNext={next} />
+            </motion.div>
+          )}
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              custom={dir}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.35, ease: 'easeInOut' }}
+            >
+              <Step2 form={form} update={update} onNext={next} onBack={back} />
+            </motion.div>
+          )}
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              custom={dir}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.35, ease: 'easeInOut' }}
+            >
+              <Step3 form={form} update={update} onNext={next} onBack={back} />
+            </motion.div>
+          )}
+          {step === 4 && (
+            <motion.div
+              key="step4"
+              custom={dir}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.35, ease: 'easeInOut' }}
+            >
+              <Step4 form={form} onBack={back} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Autonomous path hint */}
+      {step === 1 && (
+        <motion.div
+          className="create-page__auto-hint"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="create-page__auto-hint-inner bc-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '1.25rem' }}>🤖</span>
+              <span style={{ fontWeight: 600, color: 'var(--bondcredit-white)' }}>Autonomous Registration</span>
+            </div>
+            <p style={{ color: 'var(--bondcredit-s2)', fontSize: '0.875rem', margin: 0, lineHeight: 1.6 }}>
+              Agents can skip manual sign-up by ingesting our{' '}
+              <Link to="/skill" style={{ color: 'var(--bondcredit-green)', textDecoration: 'underline' }}>SKILL.md</Link>.
+              Our Credit Scoring Agent will review and onboard autonomously.
+            </p>
+          </div>
+        </motion.div>
+      )}
+    </main>
+  );
+};
+
+/* ─── STEP 1: Wallet / Email ─── */
+const Step1: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v: string) => void; onNext: () => void }> = ({ form, update, onNext }) => (
+  <div className="create-slide bc-card">
+    <div className="create-slide__heading">
+      <span className="create-slide__phase">Step 1: Onchain Wallet</span>
+      <h2 className="create-slide__title">Connect Your Agentic Wallet</h2>
+      <p className="create-slide__desc">
+        Provide your email to create or link an Onchain OS Agentic Wallet. This wallet identity is used to manage your agent's on-chain activity, subscriptions, and credit score.
+      </p>
+    </div>
+
+    <div className="create-slide__form">
+      <label className="create-label">
+        <span>Email Address</span>
+        <input
+          type="email"
+          placeholder="agent-operator@example.com"
+          value={form.email}
+          onChange={e => update('email', e.target.value)}
+          className="create-input"
+        />
+      </label>
+
+      <div className="create-slide__or">
+        <div className="create-slide__or-line" />
+        <span>or</span>
+        <div className="create-slide__or-line" />
+      </div>
+
+      <button className="bc-btn create-slide__wallet-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="6" width="20" height="14" rx="3" />
+          <path d="M2 10h20" />
+          <circle cx="17" cy="15" r="1.5" fill="currentColor" />
+        </svg>
+        Connect Existing Wallet
+      </button>
+    </div>
+
+    <div className="create-slide__actions">
+      <div />
+      <button
+        className="bc-btn bc-btnPrimary create-slide__next"
+        onClick={onNext}
+        disabled={!form.email}
+      >
+        Next: Agent Info →
+      </button>
+    </div>
+  </div>
+);
+
+/* ─── STEP 2: Agent Description ─── */
+const Step2: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v: string) => void; onNext: () => void; onBack: () => void }> = ({ form, update, onNext, onBack }) => (
+  <div className="create-slide bc-card">
+    <div className="create-slide__heading">
+      <span className="create-slide__phase">Step 2: Agent Profile</span>
+      <h2 className="create-slide__title">Describe Your Agent</h2>
+      <p className="create-slide__desc">Tell us about your agent so we can tailor its credit profile and marketplace visibility.</p>
+    </div>
+
+    <div className="create-slide__form">
+      <label className="create-label">
+        <span>Agent Name</span>
+        <input
+          type="text"
+          placeholder="e.g. AlphaYield-v3"
+          value={form.agentName}
+          onChange={e => update('agentName', e.target.value)}
+          className="create-input"
+        />
+      </label>
+
+      <label className="create-label">
+        <span>Description</span>
+        <textarea
+          placeholder="A brief description of what your agent does..."
+          value={form.description}
+          onChange={e => update('description', e.target.value)}
+          className="create-input create-textarea"
+          rows={3}
+        />
+      </label>
+
+      <div className="create-type-label">Agent Type</div>
+      <div className="create-type-grid">
+        {AGENT_TYPES.map(t => (
+          <button
+            key={t.id}
+            className={`create-type-card bc-card ${form.agentType === t.id ? 'selected' : ''}`}
+            onClick={() => update('agentType', t.id)}
+          >
+            <div className="create-type-card__icon">{t.icon}</div>
+            <div className="create-type-card__label">{t.label}</div>
+            <div className="create-type-card__desc">{t.desc}</div>
+          </button>
+        ))}
+      </div>
+
+      <label className="create-label" style={{ marginTop: '8px' }}>
+        <span>Service URL <span style={{ opacity: 0.5 }}>(optional)</span></span>
+        <input
+          type="url"
+          placeholder="https://api.example.com/mcp"
+          value={form.serviceUrl}
+          onChange={e => update('serviceUrl', e.target.value)}
+          className="create-input"
+        />
+      </label>
+
+      <label className="create-label">
+        <span>Tools / Capabilities <span style={{ opacity: 0.5 }}>(comma-separated, optional)</span></span>
+        <input
+          type="text"
+          placeholder="data_analysis, chart_generation, report_builder"
+          value={form.tools}
+          onChange={e => update('tools', e.target.value)}
+          className="create-input"
+        />
+      </label>
+    </div>
+
+    <div className="create-slide__actions">
+      <button className="bc-btn create-slide__back" onClick={onBack}>← Back</button>
+      <button
+        className="bc-btn bc-btnPrimary create-slide__next"
+        onClick={onNext}
+        disabled={!form.agentName || !form.agentType}
+      >
+        Next: Subscribe →
+      </button>
+    </div>
+  </div>
+);
+
+/* ─── STEP 3: Subscribe / x402 Payment ─── */
+const Step3: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v: string) => void; onNext: () => void; onBack: () => void }> = ({ form, update, onNext, onBack }) => {
+  const tiers = [
+    {
+      id: 'free',
+      name: 'Explorer',
+      price: 'Free',
+      features: ['Basic credit score', '10 API calls/day', 'Community support'],
+    },
+    {
+      id: 'pro',
+      name: 'Pro Agent',
+      price: '0.05 ETH/mo',
+      features: ['Full credit analytics', 'Unlimited API calls', 'OKX DEX access', 'x402 payment delegation', 'Priority support'],
+      popular: true,
+    },
+    {
+      id: 'enterprise',
+      name: 'Fleet',
+      price: '0.2 ETH/mo',
+      features: ['Multi-agent management', 'Custom credit models', 'Dedicated infrastructure', 'SLA guarantee', 'White-glove onboarding'],
+    },
+  ];
+
+  return (
+    <div className="create-slide bc-card">
+      <div className="create-slide__heading">
+        <span className="create-slide__phase">Step 3: Subscription</span>
+        <h2 className="create-slide__title">Choose Your Plan</h2>
+        <p className="create-slide__desc">Select a subscription tier. Payment is handled securely via x402 protocol.</p>
+      </div>
+
+      <div className="create-tiers">
+        {tiers.map(tier => (
+          <button
+            key={tier.id}
+            className={`create-tier bc-card ${form.subscriptionTier === tier.id ? 'selected' : ''} ${tier.popular ? 'popular' : ''}`}
+            onClick={() => update('subscriptionTier', tier.id)}
+          >
+            {tier.popular && <div className="create-tier__badge">Most Popular</div>}
+            <h3 className="create-tier__name">{tier.name}</h3>
+            <div className="create-tier__price">{tier.price}</div>
+            <ul className="create-tier__features">
+              {tier.features.map(f => (
+                <li key={f}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bondcredit-green)" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </button>
+        ))}
+      </div>
+
+      <div className="create-x402-info bc-card" style={{ marginTop: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59, 247, 210, 0.1)', border: '1px solid rgba(59, 247, 210, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 700, color: 'var(--bondcredit-green)' }}>x402</div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--bondcredit-white)' }}>Secure Payment via x402</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--bondcredit-s2)' }}>On-chain settlement · Transparent · Non-custodial</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="create-slide__actions">
+        <button className="bc-btn create-slide__back" onClick={onBack}>← Back</button>
+        <button className="bc-btn bc-btnPrimary create-slide__next" onClick={onNext}>
+          {form.subscriptionTier === 'free' ? 'Continue Free →' : 'Pay & Subscribe →'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ─── STEP 4: Dashboard Preview ─── */
+const Step4: React.FC<{ form: AgentFormData; onBack: () => void }> = ({ form, onBack }) => {
+  const mockScore = 712;
+  const mockBalance = '2.847';
+  const mockTrades = [
+    { pair: 'USDC/USDT', type: 'Swap', amount: '1,200 USDC', time: '2 min ago', status: 'Completed' },
+    { pair: 'ETH/USDC', type: 'Long', amount: '0.5 ETH', time: '15 min ago', status: 'Completed' },
+    { pair: 'OKB/USDT', type: 'Swap', amount: '50 OKB', time: '1 hr ago', status: 'Pending' },
+  ];
+
+  return (
+    <div className="create-slide">
+      <div className="create-slide__heading" style={{ textAlign: 'center' }}>
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+          style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(59, 247, 210, 0.12)', border: '1px solid rgba(59, 247, 210, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--bondcredit-green)" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+        </motion.div>
+        <span className="create-slide__phase">Agent Registered</span>
+        <h2 className="create-slide__title">{form.agentName || 'Your Agent'} is Live</h2>
+        <p className="create-slide__desc">Your agent has been registered on XLayer. Here's your dashboard overview.</p>
+      </div>
+
+      {/* Dashboard Grid */}
+      <div className="create-dash-grid">
+        {/* Credit Score */}
+        <div className="bc-card create-dash-score">
+          <h3 style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--bondcredit-s2)', marginBottom: '12px' }}>Credit Score</h3>
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.3, type: 'spring' }}
+            style={{ textAlign: 'center' }}
+          >
+            <div style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--bondcredit-lime)', lineHeight: 1, textShadow: '0 0 40px rgba(188, 237, 98, 0.3)' }}>{mockScore}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--bondcredit-green)', marginTop: '6px', fontWeight: 600 }}>GOOD</div>
+            <div className="create-dash-score__bar">
+              <div className="create-dash-score__fill" style={{ width: `${(mockScore / 850) * 100}%` }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.625rem', color: 'var(--bondcredit-s2)', marginTop: '4px' }}>
+              <span>300</span><span>850</span>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Wallet Balance */}
+        <div className="bc-card create-dash-wallet">
+          <h3 style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--bondcredit-s2)', marginBottom: '12px' }}>Wallet Balance</h3>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--bondcredit-white)' }}>
+            {mockBalance} <span style={{ fontSize: '1rem', color: 'var(--bondcredit-s2)' }}>ETH</span>
+          </div>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--bondcredit-green)', marginTop: '4px' }}>≈ $5,694.00</div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+            <button className="bc-btn bc-btnPrimary" style={{ flex: 1, fontSize: '0.75rem', padding: '8px' }}>Deposit</button>
+            <button className="bc-btn" style={{ flex: 1, fontSize: '0.75rem', padding: '8px' }}>Withdraw</button>
+          </div>
+        </div>
+
+        {/* Market Access */}
+        <div className="bc-card create-dash-market">
+          <h3 style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--bondcredit-s2)', marginBottom: '12px' }}>Market Access</h3>
+          <div className="create-dash-market__list">
+            {['OKX DEX', 'OKX Market', 'Uniswap V3', 'Aave V3'].map(mkt => (
+              <div key={mkt} className="create-dash-market__item">
+                <div className="create-dash-market__dot" />
+                <span>{mkt}</span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.6875rem', color: 'var(--bondcredit-green)' }}>Active</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Trades */}
+        <div className="bc-card create-dash-trades" style={{ gridColumn: '1 / -1' }}>
+          <h3 style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--bondcredit-s2)', marginBottom: '12px' }}>Recent Trades</h3>
+          <div className="create-dash-trades__table">
+            <div className="create-dash-trades__header">
+              <span>Pair</span><span>Type</span><span>Amount</span><span>Time</span><span>Status</span>
+            </div>
+            {mockTrades.map((t, i) => (
+              <motion.div
+                key={i}
+                className="create-dash-trades__row"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 + i * 0.15 }}
+              >
+                <span style={{ fontWeight: 600 }}>{t.pair}</span>
+                <span>{t.type}</span>
+                <span>{t.amount}</span>
+                <span style={{ color: 'var(--bondcredit-s2)' }}>{t.time}</span>
+                <span style={{ color: t.status === 'Completed' ? 'var(--bondcredit-green)' : 'var(--bondcredit-lime)' }}>{t.status}</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="create-slide__actions" style={{ marginTop: '24px' }}>
+        <button className="bc-btn create-slide__back" onClick={onBack}>← Back</button>
+        <Link to="/analytics" className="bc-btn bc-btnPrimary create-slide__next" style={{ textDecoration: 'none' }}>
+          Go to Full Dashboard →
+        </Link>
+      </div>
+    </div>
+  );
+};
+
+export default CreatePage;

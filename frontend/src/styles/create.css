@@ -1,0 +1,500 @@
+/* ═══════════════════════════════════════════════
+   Create Agent Wizard — Premium Dark UI
+   ═══════════════════════════════════════════════ */
+
+.create-page {
+  max-width: 780px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ── Header ── */
+.create-page__header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.create-page__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(59, 247, 210, 0.08);
+  border: 1px solid rgba(59, 247, 210, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.create-page__title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+  color: var(--bondcredit-white);
+}
+
+.create-page__subtitle {
+  color: var(--bondcredit-s2);
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+/* ── Stepper ── */
+.create-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 36px;
+}
+
+.create-stepper__line {
+  flex: 1;
+  max-width: 80px;
+  height: 2px;
+  border-radius: 1px;
+  transition: background 0.3s ease;
+}
+
+.create-stepper__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 64px;
+}
+
+.create-stepper__circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--bondcredit-border);
+  background: var(--bondcredit-bg2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--bondcredit-s2);
+  transition: all 0.3s ease;
+}
+
+.create-stepper__step.active .create-stepper__circle {
+  border-color: var(--bondcredit-green);
+  background: rgba(59, 247, 210, 0.12);
+  color: var(--bondcredit-green);
+  box-shadow: 0 0 20px rgba(59, 247, 210, 0.2);
+}
+
+.create-stepper__step.done .create-stepper__circle {
+  border-color: var(--bondcredit-green);
+  background: var(--bondcredit-green);
+  color: var(--bondcredit-bg);
+}
+
+.create-stepper__label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--bondcredit-s2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.create-stepper__step.active .create-stepper__label {
+  color: var(--bondcredit-green);
+}
+
+/* ── Slide Card ── */
+.create-slide {
+  padding: 32px !important;
+}
+
+.create-slide__heading {
+  margin-bottom: 28px;
+}
+
+.create-slide__phase {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--bondcredit-green);
+  margin-bottom: 8px;
+}
+
+.create-slide__title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+  color: var(--bondcredit-white);
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.create-slide__desc {
+  color: var(--bondcredit-s2);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Form Controls ── */
+.create-slide__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.create-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.create-label > span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--bondcredit-s2);
+}
+
+.create-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--bondcredit-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--bondcredit-white);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.create-input:focus {
+  border-color: rgba(59, 247, 210, 0.5);
+  box-shadow: 0 0 0 3px rgba(59, 247, 210, 0.08);
+}
+
+.create-input::placeholder {
+  color: rgba(245, 248, 255, 0.3);
+}
+
+.create-textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+/* ── OR Divider ── */
+.create-slide__or {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--bondcredit-s2);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.create-slide__or-line {
+  flex: 1;
+  height: 1px;
+  background: var(--bondcredit-border);
+}
+
+.create-slide__wallet-btn {
+  border-style: dashed !important;
+  color: var(--bondcredit-s2) !important;
+  font-size: 0.875rem !important;
+}
+
+.create-slide__wallet-btn:hover {
+  border-color: var(--bondcredit-green) !important;
+  color: var(--bondcredit-green) !important;
+}
+
+/* ── Agent Type Grid ── */
+.create-type-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--bondcredit-s2);
+  margin-bottom: -8px;
+}
+
+.create-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .create-type-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.create-type-card {
+  text-align: left;
+  cursor: pointer;
+  padding: 16px !important;
+  transition: all 0.2s ease;
+  border: 1px solid var(--bondcredit-border) !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+.create-type-card:hover {
+  border-color: rgba(59, 247, 210, 0.3) !important;
+  transform: translateY(-2px);
+}
+
+.create-type-card.selected {
+  border-color: var(--bondcredit-green) !important;
+  background: rgba(59, 247, 210, 0.06) !important;
+  box-shadow: 0 0 24px rgba(59, 247, 210, 0.08);
+}
+
+.create-type-card__icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.create-type-card__label {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--bondcredit-white);
+  margin-bottom: 4px;
+}
+
+.create-type-card__desc {
+  font-size: 0.75rem;
+  color: var(--bondcredit-s2);
+  line-height: 1.4;
+}
+
+/* ── Slide Actions ── */
+.create-slide__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--bondcredit-border);
+}
+
+.create-slide__back {
+  font-size: 0.875rem;
+  padding: 10px 20px;
+}
+
+.create-slide__next {
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 12px 28px;
+}
+
+.create-slide__next:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Subscription Tiers ── */
+.create-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .create-tiers {
+    grid-template-columns: 1fr;
+  }
+}
+
+.create-tier {
+  text-align: left;
+  cursor: pointer;
+  padding: 20px !important;
+  border: 1px solid var(--bondcredit-border) !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.create-tier:hover {
+  border-color: rgba(59, 247, 210, 0.3) !important;
+  transform: translateY(-2px);
+}
+
+.create-tier.selected {
+  border-color: var(--bondcredit-green) !important;
+  background: rgba(59, 247, 210, 0.04) !important;
+  box-shadow: 0 0 30px rgba(59, 247, 210, 0.08);
+}
+
+.create-tier.popular {
+  border-color: rgba(59, 247, 210, 0.25) !important;
+}
+
+.create-tier__badge {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  background: var(--bondcredit-green);
+  color: var(--bondcredit-bg);
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.create-tier__name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--bondcredit-white);
+  margin: 0 0 8px;
+}
+
+.create-tier__price {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--bondcredit-green);
+  margin-bottom: 16px;
+}
+
+.create-tier__features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.create-tier__features li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--bondcredit-s2);
+}
+
+/* ── Dashboard Preview ── */
+.create-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .create-dash-grid {
+    grid-template-columns: 1fr;
+  }
+  .create-dash-trades {
+    grid-column: auto !important;
+  }
+}
+
+.create-dash-score,
+.create-dash-wallet,
+.create-dash-market {
+  padding: 20px !important;
+}
+
+.create-dash-trades {
+  padding: 20px !important;
+}
+
+.create-dash-score__bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.create-dash-score__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--bondcredit-red), var(--bondcredit-lime), var(--bondcredit-green));
+  transition: width 1s ease;
+}
+
+.create-dash-market__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.create-dash-market__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--bondcredit-white);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.create-dash-market__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bondcredit-green);
+  box-shadow: 0 0 8px rgba(59, 247, 210, 0.4);
+}
+
+/* ── Trades Table ── */
+.create-dash-trades__table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.create-dash-trades__header,
+.create-dash-trades__row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1.2fr 1fr 0.8fr;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+  align-items: center;
+}
+
+.create-dash-trades__header {
+  color: var(--bondcredit-s2);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--bondcredit-border);
+}
+
+.create-dash-trades__row {
+  color: var(--bondcredit-white);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease;
+}
+
+.create-dash-trades__row:hover {
+  background: rgba(59, 247, 210, 0.03);
+}
+
+/* ── Auto Registration Hint ── */
+.create-page__auto-hint {
+  margin-top: 32px;
+  max-width: 780px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.create-page__auto-hint-inner {
+  padding: 20px 24px !important;
+  border: 1px dashed rgba(59, 247, 210, 0.2) !important;
+  background: rgba(59, 247, 210, 0.02) !important;
+}
