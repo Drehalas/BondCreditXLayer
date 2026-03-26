@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { useBondCredit } from '../context/BondCreditContext';
+
+interface Eip1193Provider {
+  request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
+}
 
 /* ─── Types ─── */
 interface AgentFormData {
   email: string;
+  walletAddress: string;
   agentName: string;
   description: string;
   agentType: string;
@@ -64,12 +70,26 @@ const slideVariants = {
   exit: (dir: number) => ({ x: dir > 0 ? -80 : 80, opacity: 0 }),
 };
 
+function getCreditAmountForTier(tier: string): number {
+  if (tier === 'free') return 0.01;
+  if (tier === 'enterprise') return 0.2;
+  return 0.0001;
+}
+
 /* ─── Main Component ─── */
 const CreatePage: React.FC = () => {
+  const { setCfg, appendLog } = useBondCredit();
   const [step, setStep] = useState(1);
   const [dir, setDir] = useState(1);
+  const [walletStatus, setWalletStatus] = useState('');
+  const [walletError, setWalletError] = useState('');
+  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState('');
+  const [subscriptionError, setSubscriptionError] = useState('');
+  const [isApplyingCredit, setIsApplyingCredit] = useState(false);
   const [form, setForm] = useState<AgentFormData>({
     email: '',
+    walletAddress: '',
     agentName: '',
     description: '',
     agentType: '',
@@ -81,6 +101,107 @@ const CreatePage: React.FC = () => {
   const next = () => { setDir(1); setStep(s => Math.min(s + 1, 4)); };
   const back = () => { setDir(-1); setStep(s => Math.max(s - 1, 1)); };
   const update = (field: keyof AgentFormData, val: string) => setForm(f => ({ ...f, [field]: val }));
+
+  const handleApplyCreditForSubscription = async () => {
+    setSubscriptionError('');
+    setSubscriptionStatus('');
+
+    if (!form.walletAddress) {
+      setSubscriptionError('Connect your wallet in Step 1 before subscribing.');
+      return;
+    }
+
+    const amount = getCreditAmountForTier(form.subscriptionTier);
+    const apiBase = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
+
+    setIsApplyingCredit(true);
+    try {
+      const applyResponse = await fetch(`${apiBase}/credit/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: form.walletAddress,
+          recipient: form.walletAddress,
+          amount,
+        }),
+      });
+
+      const applyResult = await applyResponse.json().catch(() => null);
+      if (!applyResponse.ok) {
+        const message =
+          typeof applyResult?.error === 'string' ? applyResult.error : `Credit apply failed (${applyResponse.status})`;
+        throw new Error(message);
+      }
+
+      appendLog(`credit.apply(): ${JSON.stringify(applyResult, null, 2)}`);
+
+      if (applyResult?.approved === false) {
+        const reason = typeof applyResult?.reason === 'string' ? applyResult.reason : 'Credit was not approved.';
+        setSubscriptionError(`Credit apply declined: ${reason}`);
+        return;
+      }
+
+      setSubscriptionStatus(`Credit approved for ${amount} OKB. Subscription flow completed.`);
+      next();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Subscription credit apply failed';
+      setSubscriptionError(message);
+      appendLog(`credit.apply.error(): ${message}`);
+    } finally {
+      setIsApplyingCredit(false);
+    }
+  };
+
+  const handleConnectExistingWallet = async () => {
+    setWalletError('');
+    setWalletStatus('');
+    setIsConnectingWallet(true);
+
+    try {
+      const provider = (globalThis as typeof globalThis & { ethereum?: Eip1193Provider }).ethereum;
+      if (!provider) {
+        setWalletError('No injected wallet found. Install MetaMask or another EVM wallet extension.');
+        return;
+      }
+
+      const accounts = await provider.request({ method: 'eth_requestAccounts' });
+      const connectedAddress = Array.isArray(accounts) ? String(accounts[0] ?? '') : '';
+      if (!connectedAddress) {
+        setWalletError('Wallet connected but no account address was returned.');
+        return;
+      }
+
+      update('walletAddress', connectedAddress);
+      setCfg(prev => ({ ...prev, agentId: connectedAddress }));
+
+      const apiBase = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
+      const enrollResponse = await fetch(`${apiBase}/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: connectedAddress,
+          email: form.email || undefined,
+        }),
+      });
+
+      if (!enrollResponse.ok) {
+        const errorJson = await enrollResponse.json().catch(() => null);
+        const message = typeof errorJson?.error === 'string' ? errorJson.error : `Enrollment failed (${enrollResponse.status})`;
+        throw new Error(message);
+      }
+
+      const enrollResult = await enrollResponse.json();
+      appendLog(`wallet.connect(): ${connectedAddress}`);
+      appendLog(`enroll(): ${JSON.stringify(enrollResult, null, 2)}`);
+      setWalletStatus(`Connected ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)} and enrolled successfully.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Wallet connection failed';
+      setWalletError(message);
+      appendLog(`wallet.connect.error(): ${message}`);
+    } finally {
+      setIsConnectingWallet(false);
+    }
+  };
 
   return (
     <main className="create-page wt-container" style={{ marginTop: '88px', paddingBottom: '80px' }}>
@@ -120,7 +241,15 @@ const CreatePage: React.FC = () => {
               exit="exit"
               transition={{ duration: 0.35, ease: 'easeInOut' }}
             >
-              <Step1 form={form} update={update} onNext={next} />
+              <Step1
+                form={form}
+                update={update}
+                onNext={next}
+                onConnectWallet={handleConnectExistingWallet}
+                walletStatus={walletStatus}
+                walletError={walletError}
+                connectingWallet={isConnectingWallet}
+              />
             </motion.div>
           )}
           {step === 2 && (
@@ -146,7 +275,15 @@ const CreatePage: React.FC = () => {
               exit="exit"
               transition={{ duration: 0.35, ease: 'easeInOut' }}
             >
-              <Step3 form={form} update={update} onNext={next} onBack={back} />
+              <Step3
+                form={form}
+                update={update}
+                onBack={back}
+                onSubscribe={handleApplyCreditForSubscription}
+                subscribing={isApplyingCredit}
+                subscriptionStatus={subscriptionStatus}
+                subscriptionError={subscriptionError}
+              />
             </motion.div>
           )}
           {step === 4 && (
@@ -191,7 +328,15 @@ const CreatePage: React.FC = () => {
 };
 
 /* ─── STEP 1: Wallet / Email ─── */
-const Step1: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v: string) => void; onNext: () => void }> = ({ form, update, onNext }) => (
+const Step1: React.FC<{
+  form: AgentFormData;
+  update: (k: keyof AgentFormData, v: string) => void;
+  onNext: () => void;
+  onConnectWallet: () => Promise<void>;
+  walletStatus: string;
+  walletError: string;
+  connectingWallet: boolean;
+}> = ({ form, update, onNext, onConnectWallet, walletStatus, walletError, connectingWallet }) => (
   <div className="create-slide bc-card">
     <div className="create-slide__heading">
       <span className="create-slide__phase">Step 1: Onchain Wallet</span>
@@ -219,14 +364,35 @@ const Step1: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v:
         <div className="create-slide__or-line" />
       </div>
 
-      <button className="bc-btn create-slide__wallet-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px' }}>
+      <button
+        className="bc-btn create-slide__wallet-btn"
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px' }}
+        onClick={onConnectWallet}
+        disabled={connectingWallet}
+      >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="2" y="6" width="20" height="14" rx="3" />
           <path d="M2 10h20" />
           <circle cx="17" cy="15" r="1.5" fill="currentColor" />
         </svg>
-        Connect Existing Wallet
+        {connectingWallet ? 'Connecting Wallet...' : 'Connect Existing Wallet'}
       </button>
+
+      {!!form.walletAddress && (
+        <p style={{ margin: '10px 0 0', fontSize: '0.8125rem', color: 'var(--bondcredit-green)' }}>
+          Connected wallet: {form.walletAddress}
+        </p>
+      )}
+      {!!walletStatus && (
+        <p style={{ margin: '8px 0 0', fontSize: '0.8125rem', color: 'var(--bondcredit-green)' }}>
+          {walletStatus}
+        </p>
+      )}
+      {!!walletError && (
+        <p style={{ margin: '8px 0 0', fontSize: '0.8125rem', color: '#ff7d7d' }}>
+          {walletError}
+        </p>
+      )}
     </div>
 
     <div className="create-slide__actions">
@@ -234,7 +400,7 @@ const Step1: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v:
       <button
         className="bc-btn bc-btnPrimary create-slide__next"
         onClick={onNext}
-        disabled={!form.email}
+        disabled={!form.email && !form.walletAddress}
       >
         Next: Agent Info →
       </button>
@@ -326,7 +492,15 @@ const Step2: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v:
 );
 
 /* ─── STEP 3: Subscribe / x402 Payment ─── */
-const Step3: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v: string) => void; onNext: () => void; onBack: () => void }> = ({ form, update, onNext, onBack }) => {
+const Step3: React.FC<{
+  form: AgentFormData;
+  update: (k: keyof AgentFormData, v: string) => void;
+  onBack: () => void;
+  onSubscribe: () => Promise<void>;
+  subscribing: boolean;
+  subscriptionStatus: string;
+  subscriptionError: string;
+}> = ({ form, update, onBack, onSubscribe, subscribing, subscriptionStatus, subscriptionError }) => {
   const tiers = [
     {
       id: 'free',
@@ -391,10 +565,33 @@ const Step3: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v:
 
       <div className="create-slide__actions">
         <button className="bc-btn create-slide__back" onClick={onBack}>← Back</button>
-        <button className="bc-btn bc-btnPrimary create-slide__next" onClick={onNext}>
-          {form.subscriptionTier === 'free' ? 'Continue Free →' : 'Pay & Subscribe →'}
+        <button
+          className="bc-btn bc-btnPrimary create-slide__next"
+          onClick={onSubscribe}
+          disabled={subscribing || !form.walletAddress}
+        >
+          {subscribing
+            ? 'Applying Credit...'
+            : form.subscriptionTier === 'free'
+              ? 'Apply Credit & Continue →'
+              : 'Apply Credit & Subscribe →'}
         </button>
       </div>
+      {!form.walletAddress && (
+        <p style={{ marginTop: '10px', fontSize: '0.8125rem', color: '#ffb066' }}>
+          Connect your wallet in Step 1 to continue with subscription credit.
+        </p>
+      )}
+      {!!subscriptionStatus && (
+        <p style={{ marginTop: '10px', fontSize: '0.8125rem', color: 'var(--bondcredit-green)' }}>
+          {subscriptionStatus}
+        </p>
+      )}
+      {!!subscriptionError && (
+        <p style={{ marginTop: '10px', fontSize: '0.8125rem', color: '#ff7d7d' }}>
+          {subscriptionError}
+        </p>
+      )}
     </div>
   );
 };
@@ -483,7 +680,7 @@ const Step4: React.FC<{ form: AgentFormData; onBack: () => void }> = ({ form, on
             </div>
             {mockTrades.map((t, i) => (
               <motion.div
-                key={i}
+                key={`${t.pair}-${t.time}-${i}`}
                 className="create-dash-trades__row"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}

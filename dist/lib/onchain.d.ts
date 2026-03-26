@@ -21,7 +21,9 @@ type SubscriptionWriteContract = SubscriptionReadContract & {
 };
 type GuarantorReadContract = {
     checkGuarantee(guaranteeId: string): Promise<[boolean, boolean, boolean, boolean, bigint, string]>;
+    guarantees(guaranteeId: string): Promise<[string, string, bigint, bigint, bigint, bigint, boolean, boolean, boolean, boolean, boolean, string]>;
     freeLiquidityWei(): Promise<bigint>;
+    totalOutstandingWei(): Promise<bigint>;
     outstandingByAgent(agent: string): Promise<bigint>;
     feeBps(): Promise<bigint>;
 };
@@ -33,6 +35,16 @@ type GuarantorWriteContract = GuarantorReadContract & {
         }>;
         staticCall(recipient: string, amountWei: bigint, ttlSeconds: number): Promise<string>;
     };
+    settleGuarantee(guaranteeId: string, x402PayloadHash: string): Promise<{
+        hash: string;
+        wait(): Promise<unknown>;
+    }>;
+    fundPool(overrides: {
+        value: bigint;
+    }): Promise<{
+        hash: string;
+        wait(): Promise<unknown>;
+    }>;
     cancelGuarantee(guaranteeId: string): Promise<{
         hash: string;
         wait(): Promise<unknown>;
@@ -45,7 +57,7 @@ type GuarantorWriteContract = GuarantorReadContract & {
     }>;
 };
 export declare const subscriptionManagerAbi: readonly ["function pricePerDayWei() view returns (uint256)", "function subscribe(uint256 daysToBuy) payable returns (uint256 expiry)", "function renew(uint256 daysToBuy) payable returns (uint256 expiry)", "function checkStatus(address agent) view returns (bool active, uint256 expiryDate, uint256 daysLeft, uint256 paymentCount)", "function isActive(address agent) view returns (bool)"];
-export declare const paymentGuarantorAbi: readonly ["function createGuarantee(address recipient, uint256 amountWei, uint256 ttlSeconds) returns (bytes32 guaranteeId)", "function checkGuarantee(bytes32 guaranteeId) view returns (bool active, bool used, bool cancelled, bool repaid, uint256 expiresAt, bytes32 payloadHash)", "function cancelGuarantee(bytes32 guaranteeId)", "function repayGuarantee(bytes32 guaranteeId) payable", "function markGuaranteeUsed(bytes32 guaranteeId, bytes32 x402PayloadHash)", "function freeLiquidityWei() view returns (uint256)", "function outstandingByAgent(address agent) view returns (uint256)", "function feeBps() view returns (uint256)"];
+export declare const paymentGuarantorAbi: readonly ["function createGuarantee(address recipient, uint256 amountWei, uint256 ttlSeconds) returns (bytes32 guaranteeId)", "function checkGuarantee(bytes32 guaranteeId) view returns (bool active, bool used, bool cancelled, bool repaid, uint256 expiresAt, bytes32 payloadHash)", "function guarantees(bytes32 guaranteeId) view returns (address agent, address recipient, uint256 amountWei, uint256 feeWei, uint256 createdAt, uint256 expiresAt, bool active, bool used, bool cancelled, bool repaid, bool paidOut, bytes32 x402PayloadHash)", "function settleGuarantee(bytes32 guaranteeId, bytes32 x402PayloadHash)", "function fundPool() payable", "function cancelGuarantee(bytes32 guaranteeId)", "function repayGuarantee(bytes32 guaranteeId) payable", "function markGuaranteeUsed(bytes32 guaranteeId, bytes32 x402PayloadHash)", "function freeLiquidityWei() view returns (uint256)", "function totalOutstandingWei() view returns (uint256)", "function outstandingByAgent(address agent) view returns (uint256)", "function feeBps() view returns (uint256)"];
 export declare function getProvider(cfg: BondCreditClientConfig): JsonRpcProvider | null;
 export declare function getWallet(cfg: BondCreditClientConfig): Wallet | null;
 export declare function resolveAgentAddress(cfg: BondCreditClientConfig): string | null;

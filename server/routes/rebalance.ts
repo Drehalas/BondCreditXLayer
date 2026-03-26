@@ -11,16 +11,14 @@ router.post('/rebalance', async (req: Request, res: Response, next: NextFunction
       return;
     }
 
-    // Minimal adapter: use existing credit state reads as a no-op rebalance check.
-    // vaultId is accepted for API compatibility; SDK operations require an agent identity.
-    const client = createClient(
-      process.env.BONDCREDIT_REBALANCE_AGENT_ID ||
-        '0xd931713CD30c6dBD729EDce527Ac942f7A0EC273',
-    );
+    // Always use backend signer as agentId, ignore any agentId/wallet from client
+    const backendAgentId = process.env.BONDCREDIT_REBALANCE_AGENT_ID ||
+      '0xd931713CD30c6dBD729EDce527Ac942f7A0EC273';
+    const client = createClient(backendAgentId);
     await client.credit.getLimit();
     await client.credit.getOutstanding();
 
-    res.json({ status: 'success' as const });
+    res.json({ status: 'success' as const, agentId: backendAgentId });
   } catch (error) {
     next(error);
   }

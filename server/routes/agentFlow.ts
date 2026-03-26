@@ -39,32 +39,27 @@ function decodeGuarantorErrorMessage(error: unknown): string {
 router.post('/enroll', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
-      agentId,
       email,
       walletAddress,
-    } = req.body as { agentId?: string; email?: string; walletAddress?: string };
+    } = req.body as { email?: string; walletAddress?: string };
 
-    if (!agentId || typeof agentId !== 'string') {
-      res.status(400).json({ error: 'agentId is required' });
-      return;
-    }
+    // Always use backend signer as agentId
+    const backendAgentId = process.env.BONDCREDIT_AGENTFLOW_AGENT_ID ||
+      '0xd931713CD30c6dBD729EDce527Ac942f7A0EC273';
 
     const hasEmail = typeof email === 'string' && email.trim().length > 0;
     const hasWallet = typeof walletAddress === 'string' && walletAddress.trim().length > 0;
     const normalizedEmail = hasEmail ? email.trim() : null;
-    const normalizedWalletAddress = hasWallet ? walletAddress.trim() : null;
+    const providedWalletAddress = hasWallet ? walletAddress.trim() : null;
 
-    if (!hasEmail && !hasWallet) {
-      res.status(400).json({ error: 'email or walletAddress is required' });
-      return;
-    }
-
-    if (normalizedWalletAddress && !isAddress(normalizedWalletAddress)) {
+    if (providedWalletAddress && !isAddress(providedWalletAddress)) {
       res.status(400).json({ error: 'walletAddress must be a valid EVM address' });
       return;
     }
 
-    const client = createClient(agentId);
+    const normalizedWalletAddress = providedWalletAddress ?? (isAddress(normalizedAgentId) ? normalizedAgentId : null);
+
+    const client = createClient(normalizedAgentId);
     if (!hasSubscriptionContract(client.config) || !hasGuarantorContract(client.config)) {
       res.status(500).json({ error: 'On-chain subscription and guarantor contracts must be configured' });
       return;
@@ -75,7 +70,7 @@ router.post('/enroll', async (req: Request, res: Response, next: NextFunction) =
 
     res.json({
       enrolled: true,
-      agentId,
+      agentId: normalizedAgentId,
       email: normalizedEmail,
       walletAddress: normalizedWalletAddress,
       subscription,
@@ -91,7 +86,7 @@ router.post('/enroll', async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
-router.post('/credit/apply', async (req: Request, res: Response, next: NextFunction) => {
+const handleCreditApply = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       agentId,
@@ -198,7 +193,10 @@ router.post('/credit/apply', async (req: Request, res: Response, next: NextFunct
   } catch (error) {
     next(error);
   }
-});
+};
+
+router.post('/credit/apply', handleCreditApply);
+router.post('/apply', handleCreditApply);
 
 router.post('/credit/repay', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -375,15 +373,47 @@ router.post('/credit/settle', async (req: Request, res: Response, next: NextFunc
 
 router.post('/subscription/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { agentId } = req.body as { agentId?: string };
-    if (!agentId || typeof agentId !== 'string') {
-      res.status(400).json({ error: 'agentId is required' });
-      return;
-    }
-
-    const client = createClient(agentId);
+    // Always use backend signer as agentId
+    const backendAgentId = process.env.BONDCREDIT_SUBSCRIPTION_AGENT_ID ||
+      '0xd931713CD30c6dBD729EDce527Ac942f7A0EC273';
+    const client = createClient(backendAgentId);
     const status = await client.subscription.checkStatus();
-    res.json({ subscription: status });
+    res.json({ subscription: status, agentId: backendAgentId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/subscription/subscribe', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { duration, autoRenew } = req.body as {
+      duration?: string;
+      autoRenew?: boolean;
+    };
+
+    // Always use backend signer as agentId
+    const backendAgentId = process.env.BONDCREDIT_SUBSCRIPTION_AGENT_ID ||
+      '0xd931713CD30c6dBD729EDce527Ac942f7A0EC273';
+    const client = createClient(backendAgentId);
+    const result = await client.subscription.subscribe({
+      duration: typeof duration === 'string' && duration.trim() ? duration.trim() : undefined,
+      autoRenew: typeof autoRenew === 'boolean' ? autoRenew : undefined,
+    });
+
+    res.json({ subscription: result, agentId: backendAgentId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/subscription/renew', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Always use backend signer as agentId
+    const backendAgentId = process.env.BONDCREDIT_SUBSCRIPTION_AGENT_ID ||
+      '0xd931713CD30c6dBD729EDce527Ac942f7A0EC273';
+    const client = createClient(backendAgentId);
+    const result = await client.subscription.renew();
+    res.json({ subscription: result, agentId: backendAgentId });
   } catch (error) {
     next(error);
   }

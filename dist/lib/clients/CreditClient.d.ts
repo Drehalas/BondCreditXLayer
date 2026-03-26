@@ -1,7 +1,15 @@
 import type { AvailableCredit, BondCreditClientConfig, CreditApproval, CreditLimit, CreditPosition, CreditRequestInput, CreditScore, Eligibility, RepayInput, RepayResult } from '../types.js';
 export declare class CreditClient {
     private readonly cfg;
+    private static readonly stateByAgent;
     constructor(cfg: BondCreditClientConfig);
+    private getState;
+    private static clampScore;
+    private scoreTier;
+    private repaymentSpeedFactor;
+    private getSubscriptionSignals;
+    private getScoreFactors;
+    private getScoredLimitSnapshot;
     getScore(): Promise<CreditScore>;
     getAvailableCredit(currency?: string): Promise<AvailableCredit>;
     request(input: CreditRequestInput): Promise<CreditApproval>;

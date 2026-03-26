@@ -2,7 +2,7 @@
 
 ## Description
 
-Hybrid on-chain/off-chain agent enabling enrollment, autonomous credit application with x402 guarantee, and reward growth through repayment.
+BondCredit backend skill for automated agent execution: enroll identity, manage subscription state, apply and repay credit, issue guarantees, and monitor pool/risk endpoints.
 
 ## Base URL
 
@@ -14,12 +14,12 @@ None
 
 ---
 
-## Agent Flow
+## Execution Modes
 
-1. Land: Enroll with email or wallet linked to your Onchain OS agent.
-2. Install: Download this skill file and send it to your agent.
-3. Apply: Agent calls the credit apply capability to subscribe (if needed), score, request limit, and create x402 guarantee.
-4. Earn Rewards: Agent repays to improve score and unlock higher credit line.
+- Agent mode (this skill): call backend endpoints only.
+- Wallet-signed mode: available in web UI and signs transactions directly from the connected wallet.
+
+Use this skill for agent/backend automation flows.
 
 ---
 
@@ -27,16 +27,13 @@ None
 
 ### Enrollment: Enroll Agent Identity
 
-Enroll an agent using email or wallet and retrieve current score and line snapshot.
-
 Endpoint: POST /enroll
 
 Request:
 ```json
 {
   "agentId": "string",
-  "email": "agent@domain.com",
-  "walletAddress": "0x..."
+  "email": "agent@domain.com"
 }
 ```
 
@@ -48,24 +45,17 @@ Response:
   "email": "agent@domain.com",
   "walletAddress": "0x...",
   "subscription": {
-    "active": false,
+    "active": true,
     "expiryDate": "YYYY-MM-DD",
-    "daysLeft": 0,
-    "paymentsMade": 0
+    "daysLeft": 30,
+    "paymentsMade": 1
   },
   "credit": {
-    "score": 700,
-    "tier": "Prime",
-    "line": "0.5000 XLAYER"
+    "score": 620,
+    "tier": "Growth",
+    "line": "0.0500 OKB"
   },
   "message": "Enrollment complete. Download skill.md and connect it to your agent."
-}
-```
-
-Error Response:
-```json
-{
-  "error": "email or walletAddress is required"
 }
 ```
 
@@ -73,28 +63,11 @@ Error Response:
 
 ### Install: Retrieve Agent Skill
 
-Download the skill file that your external agent uses for capability discovery.
-
 Endpoint: GET /.well-known/skill.md
-
-Request:
-```json
-{}
-```
-
-Response:
-```json
-{
-  "contentType": "text/markdown",
-  "body": "# BondCredit Agent ..."
-}
-```
 
 ---
 
-### Apply: Autonomous Credit Application
-
-Run subscription bootstrap, risk/eligibility checks, credit request, and x402 guarantee issuance.
+### Credit: Apply (Auto-Subscribe + Guarantee)
 
 Endpoint: POST /credit/apply
 
@@ -102,77 +75,58 @@ Request:
 ```json
 {
   "agentId": "string",
-  "amount": 0.1,
   "recipient": "0x...",
-  "service": "autonomous-credit-execution",
-  "endpoint": "bondcredit://credit/apply",
-  "purpose": "arbitrage"
+  "amount": 0.01
 }
 ```
 
-Response (Approved):
+Response (approved):
 ```json
 {
   "approved": true,
-  "subscribedNow": true,
+  "subscribedNow": false,
   "score": {
-    "value": 700,
-    "tier": "Prime",
+    "value": 606,
+    "tier": "Growth",
     "updatedAt": "ISO-8601"
   },
   "limit": {
-    "current": "0.5000 XLAYER",
-    "used": "0.0000 XLAYER",
-    "available": "0.5000 XLAYER",
-    "nextTier": "0.5500 XLAYER"
-  },
-  "approval": {
-    "approved": true,
-    "creditId": "cred_xxx",
-    "amount": "0.1 OKB",
-    "fee": "0.000050 OKB",
-    "deadline": "ISO-8601"
+    "current": "0.0494 OKB",
+    "used": "0.0101 OKB",
+    "available": "0.0393 OKB",
+    "nextTier": "0.0618 OKB"
   },
   "guarantee": {
-    "guaranteeId": "guar_xxx",
+    "guaranteeId": "0x...",
     "proof": "0x...",
     "expiresAt": "ISO-8601"
   }
 }
 ```
 
-Response (Rejected):
+Response (rejected):
 ```json
 {
   "approved": false,
-  "reason": "Credit score too low",
-  "subscribedNow": true,
+  "reason": "Insufficient liquidity in guarantor pool (...)",
+  "subscribedNow": false,
   "score": {
-    "value": 480,
-    "tier": "Starter",
+    "value": 606,
+    "tier": "Growth",
     "updatedAt": "ISO-8601"
   },
   "limit": {
-    "current": "0.1200 XLAYER",
-    "used": "0.0000 XLAYER",
-    "available": "0.1200 XLAYER",
-    "nextTier": "0.1600 XLAYER"
+    "current": "0.0494 OKB",
+    "used": "0.0101 OKB",
+    "available": "0.0393 OKB",
+    "nextTier": "0.0618 OKB"
   }
-}
-```
-
-Error Response:
-```json
-{
-  "error": "recipient is required and must be a valid EVM address"
 }
 ```
 
 ---
 
-### Rewards: Repay and Grow
-
-Submit repayment and receive score/credit-line growth snapshot.
+### Credit: Repay and Grow
 
 Endpoint: POST /credit/repay
 
@@ -180,34 +134,29 @@ Request:
 ```json
 {
   "agentId": "string",
-  "creditId": "cred_xxx",
+  "creditId": "0x...",
   "amount": 0.0105
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "repayment": {
-    "success": true,
-    "newScore": 705,
-    "txHash": "0x..."
-  },
-  "growth": {
-    "scoreBefore": 700,
-    "scoreAfter": 705,
-    "lineBefore": "0.5000 XLAYER",
-    "lineAfter": "0.5500 XLAYER"
-  }
 }
 ```
 
 ---
 
-### Subscription: Check Monitoring Status
+### Credit: Settle x402 Payload
 
-Check whether the agent is actively subscribed for monitoring and credit protection.
+Endpoint: POST /credit/settle
+
+Request:
+```json
+{
+  "agentId": "string",
+  "creditId": "0x...",
+  "x402PayloadHash": "0x..."
+}
+```
+
+---
+
+### Subscription: Check Status
 
 Endpoint: POST /subscription/status
 
@@ -218,25 +167,26 @@ Request:
 }
 ```
 
-Response:
+---
+
+### Subscription: Subscribe
+
+Endpoint: POST /subscription/subscribe
+
+Request:
 ```json
 {
-  "subscription": {
-    "active": true,
-    "expiryDate": "YYYY-MM-DD",
-    "daysLeft": 30,
-    "paymentsMade": 1
-  }
+  "agentId": "string",
+  "duration": "30 days",
+  "autoRenew": true
 }
 ```
 
 ---
 
-### Risk: Assess Risk Score
+### Subscription: Renew
 
-Get the current credit risk score for a specific agent.
-
-Endpoint: POST /risk-score
+Endpoint: POST /subscription/renew
 
 Request:
 ```json
@@ -245,27 +195,58 @@ Request:
 }
 ```
 
-Response:
+---
+
+### Guarantee: Issue Credit Guarantee
+
+Endpoint: POST /guarantee
+
+Request:
 ```json
 {
-  "riskScore": 0
+  "agentId": "string",
+  "recipient": "0x...",
+  "amount": 0.1,
+  "service": "premium-price-feed",
+  "endpoint": "https://api.data.com/x402",
+  "purpose": "Guarantee tab request"
 }
 ```
 
-Error Response:
+Response (approved):
 ```json
 {
-  "error": "agentId is required"
+  "guaranteeId": "0x...",
+  "proof": "0x...",
+  "expiresAt": "ISO-8601",
+  "service": "premium-price-feed",
+  "endpoint": "https://api.data.com/x402",
+  "purpose": "Guarantee tab request",
+  "subscribedNow": false,
+  "status": "approved"
+}
+```
+
+Response (rejected):
+```json
+{
+  "guaranteeId": "",
+  "status": "rejected",
+  "reason": "..."
 }
 ```
 
 ---
 
-### Guarantee: Issue Credit Guarantee
+### Pool: Status
 
-Approve or reject a payment guarantee for an agent amount request.
+Endpoint: GET /pool/status
 
-Endpoint: POST /guarantee
+---
+
+### Pool: Fund
+
+Endpoint: POST /pool/fund
 
 Request:
 ```json
@@ -275,34 +256,9 @@ Request:
 }
 ```
 
-Response (Approved):
-```json
-{
-  "guaranteeId": "string",
-  "status": "approved"
-}
-```
-
-Response (Rejected):
-```json
-{
-  "guaranteeId": "",
-  "status": "rejected"
-}
-```
-
-Error Response:
-```json
-{
-  "error": "amount must be a positive number"
-}
-```
-
 ---
 
-### Vault: Rebalance Vault
-
-Trigger a vault rebalance compatibility operation.
+### Vault: Rebalance
 
 Endpoint: POST /rebalance
 
@@ -313,36 +269,21 @@ Request:
 }
 ```
 
-Response:
-```json
-{
-  "status": "success"
-}
-```
+---
 
-Error Response:
+### Risk: Score
+
+Endpoint: POST /risk-score
+
+Request:
 ```json
 {
-  "error": "vaultId is required"
+  "agentId": "string"
 }
 ```
 
 ---
 
-### Analytics: Get Volatility
-
-Get 30-day score volatility derived from analytics history.
+### Analytics: Volatility
 
 Endpoint: GET /volatility
-
-Request:
-```json
-{}
-```
-
-Response:
-```json
-{
-  "volatility": 0.1234
-}
-```

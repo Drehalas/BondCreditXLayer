@@ -9,10 +9,14 @@ export const subscriptionManagerAbi = [
 export const paymentGuarantorAbi = [
     'function createGuarantee(address recipient, uint256 amountWei, uint256 ttlSeconds) returns (bytes32 guaranteeId)',
     'function checkGuarantee(bytes32 guaranteeId) view returns (bool active, bool used, bool cancelled, bool repaid, uint256 expiresAt, bytes32 payloadHash)',
+    'function guarantees(bytes32 guaranteeId) view returns (address agent, address recipient, uint256 amountWei, uint256 feeWei, uint256 createdAt, uint256 expiresAt, bool active, bool used, bool cancelled, bool repaid, bool paidOut, bytes32 x402PayloadHash)',
+    'function settleGuarantee(bytes32 guaranteeId, bytes32 x402PayloadHash)',
+    'function fundPool() payable',
     'function cancelGuarantee(bytes32 guaranteeId)',
     'function repayGuarantee(bytes32 guaranteeId) payable',
     'function markGuaranteeUsed(bytes32 guaranteeId, bytes32 x402PayloadHash)',
     'function freeLiquidityWei() view returns (uint256)',
+    'function totalOutstandingWei() view returns (uint256)',
     'function outstandingByAgent(address agent) view returns (uint256)',
     'function feeBps() view returns (uint256)'
 ];
