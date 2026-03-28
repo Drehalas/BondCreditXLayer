@@ -1,6 +1,9 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { formatEther, isAddress, isHexString, keccak256, parseEther, toUtf8Bytes } from 'ethers';
+import type { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { createClient } from '../client.js';
+import { getDbClient } from '../db/client.js';
 import {
   getGuarantorReadContract,
   getGuarantorWriteContract,
@@ -9,6 +12,40 @@ import {
 } from '../../src/lib/onchain.js';
 
 const router = Router();
+
+type AutonomousStageStatus = 'completed' | 'failed';
+
+interface AutonomousStage<T = Record<string, unknown>> {
+  status: AutonomousStageStatus;
+  data?: T;
+  error?: string;
+}
+
+type AutonomousFinalStatus = 'approved' | 'rejected' | 'failed';
+
+interface AutonomousWorkflowResponse {
+  workflowId: string;
+  idempotencyKey: string;
+  mode: 'autonomous';
+  stages: {
+    enroll: AutonomousStage;
+    profileUpdate: AutonomousStage;
+    subscriptionDecision: AutonomousStage;
+    creditApply: AutonomousStage;
+  };
+  finalStatus: AutonomousFinalStatus;
+  reason?: string;
+  idempotentReplay: boolean;
+}
+
+const autonomousInFlight = new Map<string, Promise<AutonomousWorkflowResponse>>();
+const autonomousCompleted = new Map<string, AutonomousWorkflowResponse>();
+
+function getCreditAmountForTier(tier: string): number {
+  if (tier === 'free') return 0.01;
+  if (tier === 'enterprise') return 0.2;
+  return 0.0001;
+}
 
 const GUARANTOR_ERROR_BY_SELECTOR: Record<string, string> = {
   '0xe6c4247b': 'Invalid recipient address',
@@ -29,8 +66,8 @@ const GUARANTOR_ERROR_BY_SELECTOR: Record<string, string> = {
 function decodeGuarantorErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return 'On-chain apply failed';
 
-  const selectorMatch = /data=\"(0x[0-9a-fA-F]{8})/.exec(error.message);
-  if (!selectorMatch || !selectorMatch[1]) return error.message;
+  const selectorMatch = /data="(0x[0-9a-fA-F]{8})/.exec(error.message);
+  if (!selectorMatch?.[1]) return error.message;
 
   const selector = selectorMatch[1].toLowerCase();
   return GUARANTOR_ERROR_BY_SELECTOR[selector] ?? error.message;
@@ -41,16 +78,60 @@ router.post('/enroll', async (req: Request, res: Response, next: NextFunction) =
     const {
       email,
       walletAddress,
-    } = req.body as { email?: string; walletAddress?: string };
+      agentName,
+      description,
+      agentType,
+      serviceUrl,
+      tools,
+    } = req.body as {
+      email?: string;
+      walletAddress?: string;
+      agentName?: string;
+      description?: string;
+      agentType?: string;
+      serviceUrl?: string;
+      tools?: unknown;
+    };
 
     // Always use backend signer as agentId
     const backendAgentId = process.env.BONDCREDIT_AGENTFLOW_AGENT_ID ||
       '0xd931713CD30c6dBD729EDce527Ac942f7A0EC273';
 
+    const normalizedAgentId = backendAgentId.trim();
+    if (!isAddress(normalizedAgentId)) {
+      res.status(500).json({ error: 'Configured backend agentId must be a valid EVM address' });
+      return;
+    }
+
     const hasEmail = typeof email === 'string' && email.trim().length > 0;
     const hasWallet = typeof walletAddress === 'string' && walletAddress.trim().length > 0;
+    const hasAgentName = typeof agentName === 'string' && agentName.trim().length > 0;
+    const hasDescription = typeof description === 'string' && description.trim().length > 0;
+    const hasAgentType = typeof agentType === 'string' && agentType.trim().length > 0;
+    const hasServiceUrl = typeof serviceUrl === 'string' && serviceUrl.trim().length > 0;
+    const hasTools = tools !== undefined;
+
     const normalizedEmail = hasEmail ? email.trim() : null;
     const providedWalletAddress = hasWallet ? walletAddress.trim() : null;
+    const normalizedAgentName = hasAgentName ? agentName.trim() : null;
+    const normalizedDescription = hasDescription ? description.trim() : null;
+    const normalizedAgentType = hasAgentType ? agentType.trim() : null;
+    const normalizedServiceUrl = hasServiceUrl ? serviceUrl.trim() : null;
+
+    const normalizedTools = (() => {
+      if (!hasTools) return undefined;
+      if (typeof tools === 'string') {
+        const values = tools
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
+        return values as Prisma.InputJsonValue;
+      }
+
+      if (Array.isArray(tools)) return tools as Prisma.InputJsonValue;
+      if (tools && typeof tools === 'object') return tools as Prisma.InputJsonValue;
+      return undefined;
+    })();
 
     if (providedWalletAddress && !isAddress(providedWalletAddress)) {
       res.status(400).json({ error: 'walletAddress must be a valid EVM address' });
@@ -58,29 +139,492 @@ router.post('/enroll', async (req: Request, res: Response, next: NextFunction) =
     }
 
     const normalizedWalletAddress = providedWalletAddress ?? (isAddress(normalizedAgentId) ? normalizedAgentId : null);
-
-    const client = createClient(normalizedAgentId);
-    if (!hasSubscriptionContract(client.config) || !hasGuarantorContract(client.config)) {
-      res.status(500).json({ error: 'On-chain subscription and guarantor contracts must be configured' });
+    if (!normalizedWalletAddress) {
+      res.status(400).json({ error: 'walletAddress is required' });
       return;
     }
-    const subscription = await client.subscription.checkStatus();
-    const score = await client.credit.getScore();
-    const limit = await client.credit.getLimit();
 
-    res.json({
-      enrolled: true,
-      agentId: normalizedAgentId,
-      email: normalizedEmail,
-      walletAddress: normalizedWalletAddress,
-      subscription,
-      credit: {
-        score: score.value,
-        tier: score.tier,
-        line: limit.current,
-      },
-      message: 'Enrollment complete. Download skill.md and connect it to your agent.'
-    });
+    const db = getDbClient();
+    console.log('[agentFlow.enroll] Attempting upsert with walletAddress:', normalizedWalletAddress);
+    
+    try {
+      const persistedAgent = await db.agent.upsert({
+        where: { walletAddress: normalizedWalletAddress },
+        update: {
+          ...(hasEmail ? { email: normalizedEmail } : {}),
+          ...(hasAgentName ? { agentName: normalizedAgentName } : {}),
+          ...(hasDescription ? { description: normalizedDescription } : {}),
+          ...(hasAgentType ? { agentType: normalizedAgentType } : {}),
+          ...(hasServiceUrl ? { serviceUrl: normalizedServiceUrl } : {}),
+          ...(hasTools ? { tools: normalizedTools } : {}),
+        },
+        create: {
+          walletAddress: normalizedWalletAddress,
+          email: normalizedEmail,
+          agentName: normalizedAgentName,
+          description: normalizedDescription,
+          agentType: normalizedAgentType,
+          serviceUrl: normalizedServiceUrl,
+          tools: normalizedTools,
+        },
+      });
+      
+      console.log('[agentFlow.enroll] Upsert successful, agent ID:', persistedAgent.id);
+
+      const client = createClient(normalizedWalletAddress);
+      if (!hasSubscriptionContract(client.config) || !hasGuarantorContract(client.config)) {
+        res.status(500).json({ error: 'On-chain subscription and guarantor contracts must be configured' });
+        return;
+      }
+      const score = await client.credit.getScore();
+      const limit = await client.credit.getLimit();
+
+      res.json({
+        enrolled: true,
+        agentId: persistedAgent.id,
+        email: normalizedEmail,
+        walletAddress: normalizedWalletAddress,
+        agent: persistedAgent,
+        credit: {
+          score: score.value,
+          tier: score.tier,
+          line: limit.current,
+        },
+        message: 'Enrollment complete. Download skill.md and connect it to your agent.'
+      });
+    } catch (dbError) {
+      console.error('[agentFlow.enroll] Database error:', dbError instanceof Error ? dbError.message : String(dbError));
+      throw dbError;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────
+// POST /agent/update - Update existing agent profile (Step 2)
+// ──────────────────────────────────────────────────────────────────
+router.post('/agent/update', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      agentId,
+      email,
+      agentName,
+      description,
+      agentType,
+      serviceUrl,
+      tools,
+    } = req.body as {
+      agentId?: number | string;
+      email?: string;
+      agentName?: string;
+      description?: string;
+      agentType?: string;
+      serviceUrl?: string;
+      tools?: unknown;
+    };
+
+    // Validate agentId (database ID from Step 1)
+    if (agentId === undefined || agentId === null) {
+      res.status(400).json({ error: 'agentId (database ID from Step 1) is required' });
+      return;
+    }
+    const numericAgentId = typeof agentId === 'string' ? parseInt(agentId, 10) : agentId;
+    if (!Number.isFinite(numericAgentId) || numericAgentId < 1) {
+      res.status(400).json({ error: 'agentId must be a valid positive number' });
+      return;
+    }
+
+    // Validate required fields for profile update
+    const hasAgentName = agentName && typeof agentName === 'string' && agentName.trim().length > 0;
+    if (!hasAgentName) {
+      res.status(400).json({ error: 'agentName is required' });
+      return;
+    }
+
+    const hasAgentType = agentType && typeof agentType === 'string' && agentType.trim().length > 0;
+    if (!hasAgentType) {
+      res.status(400).json({ error: 'agentType is required' });
+      return;
+    }
+
+    // Normalize optional fields
+    const normalizedEmail = email ? String(email).trim() : undefined;
+    const normalizedAgentName = agentName ? String(agentName).trim() : undefined;
+    const normalizedDescription = description ? String(description).trim() : undefined;
+    const normalizedAgentType = agentType ? String(agentType).trim() : undefined;
+    const normalizedServiceUrl = serviceUrl ? String(serviceUrl).trim() : undefined;
+    const normalizedTools = tools ? (typeof tools === 'string' ? tools.trim() : tools) : undefined;
+
+    const db = getDbClient();
+
+    // Update agent by database ID (from Step 1)
+    console.log('[agentFlow.update] Attempting update with agentId:', numericAgentId);
+    
+    try {
+      const updatedAgent = await db.agent.update({
+        where: { id: numericAgentId },
+        data: {
+          ...(normalizedEmail ? { email: normalizedEmail } : {}),
+          ...(normalizedAgentName ? { agentName: normalizedAgentName } : {}),
+          ...(normalizedDescription ? { description: normalizedDescription } : {}),
+          ...(normalizedAgentType ? { agentType: normalizedAgentType } : {}),
+          ...(normalizedServiceUrl ? { serviceUrl: normalizedServiceUrl } : {}),
+          ...(normalizedTools ? { tools: normalizedTools } : {}),
+        },
+      });
+      
+      console.log('[agentFlow.update] Update successful for agentId:', numericAgentId);
+
+      res.json({
+        updated: true,
+        agentId: updatedAgent.id,
+        walletAddress: updatedAgent.walletAddress,
+        agent: updatedAgent,
+        message: 'Agent profile updated successfully.'
+      });
+    } catch (dbError) {
+      console.error('[agentFlow.update] Database error:', dbError instanceof Error ? dbError.message : String(dbError));
+      throw dbError;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/autonomous/onboard-subscribe', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      idempotencyKey,
+      walletAddress,
+      email,
+      agentName,
+      description,
+      agentType,
+      serviceUrl,
+      tools,
+      subscriptionTier,
+      amount,
+      recipient,
+    } = req.body as {
+      idempotencyKey?: string;
+      walletAddress?: string;
+      email?: string;
+      agentName?: string;
+      description?: string;
+      agentType?: string;
+      serviceUrl?: string;
+      tools?: unknown;
+      subscriptionTier?: string;
+      amount?: number;
+      recipient?: string;
+    };
+
+    if (!idempotencyKey || typeof idempotencyKey !== 'string' || !idempotencyKey.trim()) {
+      res.status(400).json({ error: 'idempotencyKey is required' });
+      return;
+    }
+
+    if (!walletAddress || typeof walletAddress !== 'string' || !isAddress(walletAddress.trim())) {
+      res.status(400).json({ error: 'walletAddress is required and must be a valid EVM address' });
+      return;
+    }
+
+    if (!agentName || typeof agentName !== 'string' || !agentName.trim()) {
+      res.status(400).json({ error: 'agentName is required' });
+      return;
+    }
+
+    if (!agentType || typeof agentType !== 'string' || !agentType.trim()) {
+      res.status(400).json({ error: 'agentType is required' });
+      return;
+    }
+
+    const normalizedIdempotencyKey = idempotencyKey.trim();
+
+    const cached = autonomousCompleted.get(normalizedIdempotencyKey);
+    if (cached) {
+      res.json({ ...cached, idempotentReplay: true });
+      return;
+    }
+
+    const inFlight = autonomousInFlight.get(normalizedIdempotencyKey);
+    if (inFlight !== undefined) {
+      const replay = await inFlight;
+      res.json({ ...replay, idempotentReplay: true });
+      return;
+    }
+
+    const workflowPromise = (async (): Promise<AutonomousWorkflowResponse> => {
+      const workflowId = randomUUID();
+      const normalizedWalletAddress = walletAddress.trim();
+      const normalizedEmail = typeof email === 'string' && email.trim() ? email.trim() : null;
+      const normalizedAgentName = agentName.trim();
+      const normalizedDescription = typeof description === 'string' && description.trim() ? description.trim() : null;
+      const normalizedAgentType = agentType.trim();
+      const normalizedServiceUrl = typeof serviceUrl === 'string' && serviceUrl.trim() ? serviceUrl.trim() : null;
+      const normalizedRecipient =
+        typeof recipient === 'string' && recipient.trim().length > 0
+          ? recipient.trim()
+          : normalizedWalletAddress;
+
+      const fallbackTier = typeof subscriptionTier === 'string' ? subscriptionTier : 'pro';
+      const requestedAmount =
+        typeof amount === 'number' && Number.isFinite(amount) && amount > 0
+          ? amount
+          : getCreditAmountForTier(fallbackTier);
+
+      const stages: AutonomousWorkflowResponse['stages'] = {
+        enroll: { status: 'failed' },
+        profileUpdate: { status: 'failed' },
+        subscriptionDecision: { status: 'failed' },
+        creditApply: { status: 'failed' },
+      };
+
+      try {
+        const db = getDbClient();
+
+        const normalizedTools = (() => {
+          if (tools === undefined) return undefined;
+          if (typeof tools === 'string') {
+            const values = tools
+              .split(',')
+              .map(item => item.trim())
+              .filter(Boolean);
+            return values as Prisma.InputJsonValue;
+          }
+          if (Array.isArray(tools)) return tools as Prisma.InputJsonValue;
+          if (tools && typeof tools === 'object') return tools as Prisma.InputJsonValue;
+          return undefined;
+        })();
+
+        const toolsPatch = normalizedTools === undefined ? {} : { tools: normalizedTools };
+
+        const persistedAgent = await db.agent.upsert({
+          where: { walletAddress: normalizedWalletAddress },
+          update: {
+            email: normalizedEmail,
+            agentName: normalizedAgentName,
+            description: normalizedDescription,
+            agentType: normalizedAgentType,
+            serviceUrl: normalizedServiceUrl,
+            ...toolsPatch,
+          },
+          create: {
+            walletAddress: normalizedWalletAddress,
+            email: normalizedEmail,
+            agentName: normalizedAgentName,
+            description: normalizedDescription,
+            agentType: normalizedAgentType,
+            serviceUrl: normalizedServiceUrl,
+            ...toolsPatch,
+          },
+        });
+
+        const client = createClient(normalizedWalletAddress);
+        if (!hasSubscriptionContract(client.config) || !hasGuarantorContract(client.config)) {
+          const reason = 'On-chain subscription and guarantor contracts must be configured';
+          stages.enroll = { status: 'failed', error: reason };
+          stages.profileUpdate = { status: 'failed', error: reason };
+          stages.subscriptionDecision = { status: 'failed', error: reason };
+          stages.creditApply = { status: 'failed', error: reason };
+          return {
+            workflowId,
+            idempotencyKey: normalizedIdempotencyKey,
+            mode: 'autonomous',
+            stages,
+            finalStatus: 'failed',
+            reason,
+            idempotentReplay: false,
+          };
+        }
+
+        const scoreAfterEnroll = await client.credit.getScore();
+        const limitAfterEnroll = await client.credit.getLimit();
+        stages.enroll = {
+          status: 'completed',
+          data: {
+            agentId: persistedAgent.id,
+            walletAddress: persistedAgent.walletAddress,
+            score: scoreAfterEnroll.value,
+            tier: scoreAfterEnroll.tier,
+            line: limitAfterEnroll.current,
+          },
+        };
+
+        stages.profileUpdate = {
+          status: 'completed',
+          data: {
+            agentId: persistedAgent.id,
+            agentName: persistedAgent.agentName,
+            agentType: persistedAgent.agentType,
+          },
+        };
+
+        const subscriptionBefore = await client.subscription.checkStatus();
+        let subscribedNow = false;
+        if (!subscriptionBefore.active) {
+          await client.subscription.subscribe({ duration: '30 days', autoRenew: true });
+          subscribedNow = true;
+        }
+        const subscriptionAfter = await client.subscription.checkStatus();
+        stages.subscriptionDecision = {
+          status: 'completed',
+          data: {
+            activeBefore: subscriptionBefore.active,
+            subscribedNow,
+            activeAfter: subscriptionAfter.active,
+            daysLeft: subscriptionAfter.daysLeft,
+          },
+        };
+
+        if (!isAddress(normalizedRecipient)) {
+          const reason = 'recipient is required and must be a valid EVM address';
+          stages.creditApply = { status: 'failed', error: reason };
+          return {
+            workflowId,
+            idempotencyKey: normalizedIdempotencyKey,
+            mode: 'autonomous',
+            stages,
+            finalStatus: 'failed',
+            reason,
+            idempotentReplay: false,
+          };
+        }
+
+        const read = getGuarantorReadContract(client.config);
+        const write = getGuarantorWriteContract(client.config);
+        if (!read || !write) {
+          const reason = 'On-chain apply requires rpcUrl, guarantor address, and privateKey';
+          stages.creditApply = { status: 'failed', error: reason };
+          return {
+            workflowId,
+            idempotencyKey: normalizedIdempotencyKey,
+            mode: 'autonomous',
+            stages,
+            finalStatus: 'failed',
+            reason,
+            idempotentReplay: false,
+          };
+        }
+
+        const amountWei = parseEther(String(requestedAmount));
+        const ttlSeconds = Math.max(
+          60,
+          Number(process.env.BONDCREDIT_DEFAULT_GUARANTEE_TTL_SECONDS ?? 25 * 60),
+        );
+
+        const freeLiquidityWei = await read.freeLiquidityWei();
+        if (amountWei > freeLiquidityWei) {
+          const score = await client.credit.getScore();
+          const limit = await client.credit.getLimit();
+          const reason = `Insufficient liquidity in guarantor pool (requested ${formatEther(amountWei)} OKB, available ${formatEther(freeLiquidityWei)} OKB)`;
+
+          stages.creditApply = {
+            status: 'completed',
+            data: {
+              approved: false,
+              reason,
+              score,
+              limit,
+            },
+          };
+
+          return {
+            workflowId,
+            idempotencyKey: normalizedIdempotencyKey,
+            mode: 'autonomous',
+            stages,
+            finalStatus: 'rejected',
+            reason,
+            idempotentReplay: false,
+          };
+        }
+
+        try {
+          const guaranteeId = await write.createGuarantee.staticCall(normalizedRecipient, amountWei, ttlSeconds);
+          const tx = await write.createGuarantee(normalizedRecipient, amountWei, ttlSeconds);
+          await tx.wait();
+
+          const status = await read.checkGuarantee(guaranteeId);
+          const expiresAt = new Date(Number(status[4]) * 1000).toISOString();
+          const score = await client.credit.getScore();
+          const limit = await client.credit.getLimit();
+
+          stages.creditApply = {
+            status: 'completed',
+            data: {
+              approved: true,
+              amount: requestedAmount,
+              score,
+              limit,
+              guarantee: {
+                guaranteeId,
+                proof: tx.hash,
+                expiresAt,
+              },
+            },
+          };
+
+          return {
+            workflowId,
+            idempotencyKey: normalizedIdempotencyKey,
+            mode: 'autonomous',
+            stages,
+            finalStatus: 'approved',
+            idempotentReplay: false,
+          };
+        } catch (error) {
+          const reason = decodeGuarantorErrorMessage(error);
+          const score = await client.credit.getScore();
+          const limit = await client.credit.getLimit();
+
+          stages.creditApply = {
+            status: 'completed',
+            data: {
+              approved: false,
+              reason,
+              score,
+              limit,
+            },
+          };
+
+          return {
+            workflowId,
+            idempotencyKey: normalizedIdempotencyKey,
+            mode: 'autonomous',
+            stages,
+            finalStatus: 'rejected',
+            reason,
+            idempotentReplay: false,
+          };
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Autonomous orchestration failed';
+        if (stages.enroll.status !== 'completed') stages.enroll = { status: 'failed', error: reason };
+        if (stages.profileUpdate.status !== 'completed') stages.profileUpdate = { status: 'failed', error: reason };
+        if (stages.subscriptionDecision.status !== 'completed') stages.subscriptionDecision = { status: 'failed', error: reason };
+        if (stages.creditApply.status !== 'completed') stages.creditApply = { status: 'failed', error: reason };
+
+        return {
+          workflowId,
+          idempotencyKey: normalizedIdempotencyKey,
+          mode: 'autonomous',
+          stages,
+          finalStatus: 'failed',
+          reason,
+          idempotentReplay: false,
+        };
+      }
+    })();
+
+    autonomousInFlight.set(normalizedIdempotencyKey, workflowPromise);
+
+    const result = await workflowPromise;
+    autonomousInFlight.delete(normalizedIdempotencyKey);
+    autonomousCompleted.set(normalizedIdempotencyKey, result);
+
+    res.json(result);
   } catch (error) {
     next(error);
   }

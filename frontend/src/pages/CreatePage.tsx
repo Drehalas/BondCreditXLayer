@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BrowserProvider, Contract } from 'ethers';
 import { Coins, TrendingUp, Eye, Settings, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -84,6 +85,134 @@ function getCreditAmountForTier(tier: string): number {
   return 0.0001;
 }
 
+const DEFAULT_SUBSCRIPTION_MANAGER_ADDRESS = '0xAEA215B9F67E0d87B9B89828A1F2dE365Ef1EAd5';
+const DEFAULT_XLAYER_TESTNET_CHAIN_ID = 1952n;
+const DEFAULT_XLAYER_TESTNET_RPC_URL = 'https://testrpc.xlayer.tech';
+const DEFAULT_XLAYER_TESTNET_EXPLORER_URL = 'https://www.oklink.com/xlayer-test';
+const SUBSCRIPTION_MANAGER_ABI = [
+  'function pricePerDayWei() view returns (uint256)',
+  'function subscribe(uint256 daysToBuy) payable returns (uint256 expiry)'
+] as const;
+
+function getSubscriptionDaysForTier(_tier: string): number {
+  return 30;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isWalletActionRejected(error)) return 'Transaction signature was rejected in wallet.';
+
+  const shortMessage = getObjectStringField(error, 'shortMessage');
+  if (shortMessage) {
+    const mapped = mapKnownWalletMessage(shortMessage);
+    if (mapped) return mapped;
+    return shortMessage;
+  }
+
+  const message = getObjectStringField(error, 'message');
+  if (message) {
+    const mapped = mapKnownWalletMessage(message);
+    if (mapped) return mapped;
+  }
+
+  return error instanceof Error ? error.message : 'Subscription transaction failed';
+}
+
+function toHexChainId(chainId: bigint): string {
+  return `0x${chainId.toString(16)}`;
+}
+
+function getErrorCode(error: unknown): unknown {
+  if (typeof error !== 'object' || error === null) return undefined;
+  return (error as { code?: unknown }).code;
+}
+
+function isWalletActionRejected(error: unknown): boolean {
+  const code = getErrorCode(error);
+  return code === 4001 || code === 'ACTION_REJECTED';
+}
+
+function getObjectStringField(error: unknown, field: 'shortMessage' | 'message'): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const value = (error as { shortMessage?: unknown; message?: unknown })[field];
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function mapKnownWalletMessage(message: string): string | null {
+  const lower = message.toLowerCase();
+  if (lower.includes('could not decode result data')) {
+    return 'Could not read subscription pricing from this network. Switch wallet network to XLayer testnet and retry.';
+  }
+  if (lower.includes('could not add network that points to same rpc endpoint')) {
+    return 'XLayer testnet may already be configured in your wallet. Switch to it in MetaMask and retry.';
+  }
+  if (lower.includes('wallet network switch rejected')) {
+    return 'Wallet network switch was rejected. Please switch to XLayer testnet and try again.';
+  }
+  return null;
+}
+
+async function switchWalletChain(injected: Eip1193Provider, expectedHex: string): Promise<void> {
+  await injected.request({
+    method: 'wallet_switchEthereumChain',
+    params: [{ chainId: expectedHex }],
+  });
+}
+
+async function addWalletChain(injected: Eip1193Provider, expectedHex: string): Promise<void> {
+  await injected.request({
+    method: 'wallet_addEthereumChain',
+    params: [{
+      chainId: expectedHex,
+      chainName: 'X Layer Testnet',
+      nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
+      rpcUrls: [import.meta.env.VITE_XLAYER_TESTNET_RPC_URL ?? DEFAULT_XLAYER_TESTNET_RPC_URL],
+      blockExplorerUrls: [
+        import.meta.env.VITE_XLAYER_TESTNET_EXPLORER_URL ?? DEFAULT_XLAYER_TESTNET_EXPLORER_URL,
+      ],
+    }],
+  });
+}
+
+async function ensureWalletOnExpectedChain(
+  provider: BrowserProvider,
+  injected: Eip1193Provider,
+  expectedChainId: bigint,
+): Promise<void> {
+  const current = await provider.getNetwork();
+  if (current.chainId === expectedChainId) return;
+
+  const expectedHex = toHexChainId(expectedChainId);
+
+  try {
+    await switchWalletChain(injected, expectedHex);
+    return;
+  } catch (switchError) {
+    const maybeCode = getErrorCode(switchError);
+
+    if (maybeCode === 4902) {
+      try {
+        await addWalletChain(injected, expectedHex);
+        await switchWalletChain(injected, expectedHex);
+        return;
+      } catch (addError) {
+        if (isWalletActionRejected(addError)) {
+          throw new Error('Wallet network switch rejected');
+        }
+
+        throw addError;
+      }
+    }
+
+    if (isWalletActionRejected(switchError)) {
+      throw new Error('Wallet network switch rejected');
+    }
+
+    throw switchError;
+  }
+}
+
 /* ─── Main Component ─── */
 const CreatePage: React.FC = () => {
   const { setCfg, appendLog } = useBondCredit();
@@ -95,6 +224,9 @@ const CreatePage: React.FC = () => {
   const [subscriptionStatus, setSubscriptionStatus] = useState('');
   const [subscriptionError, setSubscriptionError] = useState('');
   const [isApplyingCredit, setIsApplyingCredit] = useState(false);
+  const [isSavingAgentProfile, setIsSavingAgentProfile] = useState(false);
+  const [agentProfileError, setAgentProfileError] = useState('');
+  const [agentDbId, setAgentDbId] = useState<number | null>(null);
   const [form, setForm] = useState<AgentFormData>({
     email: '',
     walletAddress: '',
@@ -119,44 +251,176 @@ const CreatePage: React.FC = () => {
       return;
     }
 
-    const amount = getCreditAmountForTier(form.subscriptionTier);
-    const apiBase = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
-
     setIsApplyingCredit(true);
     try {
-      const applyResponse = await fetch(`${apiBase}/credit/apply`, {
+      const injected = (globalThis as typeof globalThis & { ethereum?: Eip1193Provider }).ethereum;
+      if (!injected) {
+        throw new Error('No wallet found. Install MetaMask or another injected EVM wallet.');
+      }
+
+      setSubscriptionStatus('Connecting wallet...');
+      const provider = new BrowserProvider(injected);
+      await injected.request({ method: 'eth_requestAccounts' });
+
+      const expectedChainIdRaw = import.meta.env.VITE_BONDCREDIT_CHAIN_ID;
+      const expectedChainId = expectedChainIdRaw ? BigInt(expectedChainIdRaw) : DEFAULT_XLAYER_TESTNET_CHAIN_ID;
+      setSubscriptionStatus('Switching wallet to XLayer testnet...');
+      await ensureWalletOnExpectedChain(provider, injected, expectedChainId);
+
+      const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+
+      if (signerAddress.toLowerCase() !== form.walletAddress.toLowerCase()) {
+        throw new Error('Connected wallet does not match Step 1 wallet. Switch wallet account and try again.');
+      }
+
+      const subscriptionManagerAddress =
+        import.meta.env.VITE_BONDCREDIT_SUBSCRIPTION_MANAGER ?? DEFAULT_SUBSCRIPTION_MANAGER_ADDRESS;
+
+      setSubscriptionStatus('Wallet connected. Verifying network...');
+      const network = await provider.getNetwork();
+      const contractCode = await provider.getCode(subscriptionManagerAddress);
+      if (contractCode === '0x') {
+        throw new Error(
+          `Subscription contract is not deployed at ${subscriptionManagerAddress} on chainId ${network.chainId.toString()}. Switch wallet to XLayer testnet and retry.`
+        );
+      }
+
+      const subscriptionContract = new Contract(subscriptionManagerAddress, SUBSCRIPTION_MANAGER_ABI, signer);
+
+      const daysToBuy = getSubscriptionDaysForTier(form.subscriptionTier);
+      setSubscriptionStatus('Preparing subscription transaction...');
+      const pricePerDayWei = await subscriptionContract.pricePerDayWei();
+      const totalValueWei = pricePerDayWei * BigInt(daysToBuy);
+
+      setSubscriptionStatus('Awaiting wallet signature...');
+      const tx = await subscriptionContract.subscribe(daysToBuy, { value: totalValueWei });
+
+      setSubscriptionStatus('Transaction pending...');
+      await tx.wait();
+
+      appendLog(
+        `subscription.manual.sign(): ${JSON.stringify({
+          wallet: signerAddress,
+          txHash: tx.hash,
+          daysToBuy,
+          tier: form.subscriptionTier,
+        }, null, 2)}`
+      );
+
+      const amount = getCreditAmountForTier(form.subscriptionTier);
+      setSubscriptionStatus(`Success. Subscription confirmed for ${daysToBuy} days. Tx: ${tx.hash.slice(0, 10)}... Credit target: ${amount} OKB.`);
+
+      next();
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setSubscriptionError(message);
+      appendLog(`subscription.manual.sign.error(): ${message}`);
+    } finally {
+      setIsApplyingCredit(false);
+    }
+  };
+
+  const handleStep1Next = async () => {
+    setWalletError('');
+    setWalletStatus('');
+
+    const normalizedEmail = form.email.trim();
+    const normalizedWalletAddress = form.walletAddress.trim();
+
+    if (!normalizedEmail) {
+      setWalletError('Enter your email before continuing.');
+      return;
+    }
+
+    if (!normalizedWalletAddress) {
+      setWalletError('Connect your wallet before continuing.');
+      return;
+    }
+
+    const apiBase = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
+    setIsConnectingWallet(true);
+
+    try {
+      const enrollResponse = await fetch(`${apiBase}/enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agentId: form.walletAddress,
-          recipient: form.walletAddress,
-          amount,
+          walletAddress: normalizedWalletAddress,
+          email: normalizedEmail,
         }),
       });
 
-      const applyResult = await applyResponse.json().catch(() => null);
-      if (!applyResponse.ok) {
+      const enrollResult = await enrollResponse.json().catch(() => null);
+      if (!enrollResponse.ok) {
         const message =
-          typeof applyResult?.error === 'string' ? applyResult.error : `Credit apply failed (${applyResponse.status})`;
+          typeof enrollResult?.error === 'string' ? enrollResult.error : `Enrollment failed (${enrollResponse.status})`;
         throw new Error(message);
       }
 
-      appendLog(`credit.apply(): ${JSON.stringify(applyResult, null, 2)}`);
-
-      if (applyResult?.approved === false) {
-        const reason = typeof applyResult?.reason === 'string' ? applyResult.reason : 'Credit was not approved.';
-        setSubscriptionError(`Credit apply declined: ${reason}`);
-        return;
+      appendLog(`enroll(): ${JSON.stringify(enrollResult, null, 2)}`);
+      // Capture DB agentId from Step 1 enrollment for use in Step 2 update
+      if (typeof enrollResult?.agentId === 'number') {
+        setAgentDbId(enrollResult.agentId);
       }
-
-      setSubscriptionStatus(`Credit approved for ${amount} OKB. Subscription flow completed.`);
+      setWalletStatus('Email and wallet saved successfully.');
       next();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Subscription credit apply failed';
-      setSubscriptionError(message);
-      appendLog(`credit.apply.error(): ${message}`);
+      const message = error instanceof Error ? error.message : 'Enrollment failed';
+      setWalletError(message);
+      appendLog(`enroll.error(): ${message}`);
     } finally {
-      setIsApplyingCredit(false);
+      setIsConnectingWallet(false);
+    }
+  };
+
+  const handleStep2Next = async () => {
+    setAgentProfileError('');
+
+    // Validate that we have the agentDbId from Step 1
+    if (agentDbId === null) {
+      setAgentProfileError('Missing agent database ID from Step 1. Go back and complete Step 1 enrollment first.');
+      return;
+    }
+
+    if (!form.agentName.trim() || !form.agentType.trim()) {
+      setAgentProfileError('Agent Name and Agent Type are required.');
+      return;
+    }
+
+    const apiBase = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
+    setIsSavingAgentProfile(true);
+    try {
+      // Step 2: Call /agent/update with database agentId (not walletAddress)
+      const updateResponse = await fetch(`${apiBase}/agent/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: agentDbId,  // Database ID from Step 1
+          email: form.email.trim() || undefined,
+          agentName: form.agentName.trim(),
+          description: form.description.trim() || undefined,
+          agentType: form.agentType,
+          serviceUrl: form.serviceUrl.trim() || undefined,
+          tools: form.tools.trim() || undefined,
+        }),
+      });
+
+      const updateResult = await updateResponse.json().catch(() => null);
+      if (!updateResponse.ok) {
+        const message =
+          typeof updateResult?.error === 'string' ? updateResult.error : `Profile save failed (${updateResponse.status})`;
+        throw new Error(message);
+      }
+
+      appendLog(`agent.update(): ${JSON.stringify(updateResult, null, 2)}`);
+      next();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Profile save failed';
+      setAgentProfileError(message);
+      appendLog(`agent.update.error(): ${message}`);
+    } finally {
+      setIsSavingAgentProfile(false);
     }
   };
 
@@ -181,27 +445,8 @@ const CreatePage: React.FC = () => {
 
       update('walletAddress', connectedAddress);
       setCfg(prev => ({ ...prev, agentId: connectedAddress }));
-
-      const apiBase = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
-      const enrollResponse = await fetch(`${apiBase}/enroll`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agentId: connectedAddress,
-          email: form.email || undefined,
-        }),
-      });
-
-      if (!enrollResponse.ok) {
-        const errorJson = await enrollResponse.json().catch(() => null);
-        const message = typeof errorJson?.error === 'string' ? errorJson.error : `Enrollment failed (${enrollResponse.status})`;
-        throw new Error(message);
-      }
-
-      const enrollResult = await enrollResponse.json();
       appendLog(`wallet.connect(): ${connectedAddress}`);
-      appendLog(`enroll(): ${JSON.stringify(enrollResult, null, 2)}`);
-      setWalletStatus(`Connected ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)} and enrolled successfully.`);
+      setWalletStatus(`Connected ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}. Click Next to save email + wallet.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Wallet connection failed';
       setWalletError(message);
@@ -252,7 +497,7 @@ const CreatePage: React.FC = () => {
               <Step1
                 form={form}
                 update={update}
-                onNext={next}
+                onNext={handleStep1Next}
                 onConnectWallet={handleConnectExistingWallet}
                 walletStatus={walletStatus}
                 walletError={walletError}
@@ -270,7 +515,14 @@ const CreatePage: React.FC = () => {
               exit="exit"
               transition={{ duration: 0.35, ease: 'easeInOut' }}
             >
-              <Step2 form={form} update={update} onNext={next} onBack={back} />
+              <Step2
+                form={form}
+                update={update}
+                onNext={handleStep2Next}
+                onBack={back}
+                saving={isSavingAgentProfile}
+                error={agentProfileError}
+              />
             </motion.div>
           )}
           {step === 3 && (
@@ -331,6 +583,12 @@ const CreatePage: React.FC = () => {
           </div>
         </motion.div>
       )}
+
+      {/* {agentDbId !== null && step >= 2 && (
+        <p style={{ marginTop: '12px', color: 'var(--bondcredit-s2)', fontSize: '0.75rem', textAlign: 'center' }}>
+          Agent DB ID: {agentDbId}
+        </p>
+      )} */}
     </main>
   );
 };
@@ -367,9 +625,9 @@ const Step1: React.FC<{
       </label>
 
       <div className="create-slide__or">
-        <div className="create-slide__or-line" />
-        <span>or</span>
-        <div className="create-slide__or-line" />
+        {/* <div className="create-slide__or-line" /> */}
+        {/* <span>or</span> */}
+        {/* <div className="create-slide__or-line" /> */}
       </div>
 
       <button
@@ -391,11 +649,6 @@ const Step1: React.FC<{
           Connected wallet: {form.walletAddress}
         </p>
       )}
-      {!!walletStatus && (
-        <p style={{ margin: '8px 0 0', fontSize: '0.8125rem', color: 'var(--bondcredit-green)' }}>
-          {walletStatus}
-        </p>
-      )}
       {!!walletError && (
         <p style={{ margin: '8px 0 0', fontSize: '0.8125rem', color: '#ff7d7d' }}>
           {walletError}
@@ -408,16 +661,23 @@ const Step1: React.FC<{
       <button
         className="bc-btn bc-btnPrimary create-slide__next"
         onClick={onNext}
-        disabled={!form.email && !form.walletAddress}
+        disabled={connectingWallet || !form.email || !form.walletAddress}
       >
-        Next: Agent Info →
+        {connectingWallet ? 'Saving...' : 'Next: Agent Info →'}
       </button>
     </div>
   </div>
 );
 
 /* ─── STEP 2: Agent Description ─── */
-const Step2: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v: string) => void; onNext: () => void; onBack: () => void }> = ({ form, update, onNext, onBack }) => (
+const Step2: React.FC<{
+  form: AgentFormData;
+  update: (k: keyof AgentFormData, v: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+  saving: boolean;
+  error: string;
+}> = ({ form, update, onNext, onBack, saving, error }) => (
   <div className="create-slide bc-card">
     <div className="create-slide__heading">
       <span className="create-slide__phase">Step 2: Agent Profile</span>
@@ -491,11 +751,17 @@ const Step2: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v:
       <button
         className="bc-btn bc-btnPrimary create-slide__next"
         onClick={onNext}
-        disabled={!form.agentName || !form.agentType}
+        disabled={saving || !form.agentName || !form.agentType}
       >
-        Next: Subscribe →
+        {saving ? 'Saving Profile...' : 'Next: Subscribe →'}
       </button>
     </div>
+
+    {!!error && (
+      <p style={{ marginTop: '10px', fontSize: '0.8125rem', color: '#ff7d7d' }}>
+        {error}
+      </p>
+    )}
   </div>
 );
 
@@ -509,6 +775,13 @@ const Step3: React.FC<{
   subscriptionStatus: string;
   subscriptionError: string;
 }> = ({ form, update, onBack, onSubscribe, subscribing, subscriptionStatus, subscriptionError }) => {
+  let subscribeButtonText = 'Sign & Subscribe →';
+  if (subscribing) {
+    subscribeButtonText = 'Waiting for Wallet...';
+  } else if (form.subscriptionTier === 'free') {
+    subscribeButtonText = 'Sign & Continue →';
+  }
+
   const tiers = [
     {
       id: 'free',
@@ -578,11 +851,7 @@ const Step3: React.FC<{
           onClick={onSubscribe}
           disabled={subscribing || !form.walletAddress}
         >
-          {subscribing
-            ? 'Applying Credit...'
-            : form.subscriptionTier === 'free'
-              ? 'Apply Credit & Continue →'
-              : 'Apply Credit & Subscribe →'}
+          {subscribeButtonText}
         </button>
       </div>
       {!form.walletAddress && (

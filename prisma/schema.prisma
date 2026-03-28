@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Agent {
+  id            Int      @id @default(autoincrement())
+  walletAddress String   @unique
+  email         String?
+
+  agentName     String?
+  description   String?
+  agentType     String?
+
+  serviceUrl    String?
+  tools         Json?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

@@ -1,8 +1,10 @@
-# BondCredit Agent
+# BondCredit Agent Skill
 
 ## Description
 
-BondCredit backend skill for automated agent execution: enroll identity, manage subscription state, apply and repay credit, issue guarantees, and monitor pool/risk endpoints.
+Machine-readable contract for backend automation flows: enroll identity, update profile,
+apply credit with guarantee issuance, repay/settle guarantees, query subscription and pool
+status, fund pool liquidity, rebalance, and retrieve risk/volatility snapshots.
 
 ## Base URL
 
@@ -12,28 +14,41 @@ http://localhost:3000
 
 None
 
----
+## Canonical Path
 
-## Execution Modes
+The canonical file path is:
 
-- Agent mode (this skill): call backend endpoints only.
-- Wallet-signed mode: available in web UI and signs transactions directly from the connected wallet.
+Endpoint: GET /.well-known/skill.md
 
-Use this skill for agent/backend automation flows.
+Compatibility alias currently exists for legacy clients:
+
+Endpoint: GET /.well-known/SKILL.md
+
+## Execution Notes
+
+- Some endpoints always use backend signer IDs from env vars (subscription, guarantee, risk, rebalance).
+- For `POST /credit/apply`, `recipient` defaults to `agentId` if omitted.
+- Guarantee IDs and credit IDs are 32-byte hex values (`0x...`, 66 chars total).
+- Manual onboarding endpoints remain unchanged and are still supported.
 
 ---
 
 ## Capabilities
 
-### Enrollment: Enroll Agent Identity
+### Enroll Agent Identity
 
 Endpoint: POST /enroll
 
 Request:
 ```json
 {
-  "agentId": "string",
-  "email": "agent@domain.com"
+  "walletAddress": "0x...",
+  "email": "agent-operator@example.com",
+  "agentName": "optional",
+  "description": "optional",
+  "agentType": "optional",
+  "serviceUrl": "optional",
+  "tools": "optional"
 }
 ```
 
@@ -41,14 +56,12 @@ Response:
 ```json
 {
   "enrolled": true,
-  "agentId": "string",
-  "email": "agent@domain.com",
+  "agentId": 12,
+  "email": "agent-operator@example.com",
   "walletAddress": "0x...",
-  "subscription": {
-    "active": true,
-    "expiryDate": "YYYY-MM-DD",
-    "daysLeft": 30,
-    "paymentsMade": 1
+  "agent": {
+    "id": 12,
+    "walletAddress": "0x..."
   },
   "credit": {
     "score": 620,
@@ -59,24 +72,92 @@ Response:
 }
 ```
 
----
+### Update Agent Profile
 
-### Install: Retrieve Agent Skill
+Endpoint: POST /agent/update
+
+Request:
+```json
+{
+  "agentId": 12,
+  "agentName": "AlphaYield-v3",
+  "agentType": "stablecoin",
+  "email": "optional",
+  "description": "optional",
+  "serviceUrl": "optional",
+  "tools": "optional"
+}
+```
+
+Response:
+```json
+{
+  "updated": true,
+  "agentId": 12,
+  "walletAddress": "0x...",
+  "agent": {
+    "id": 12,
+    "agentName": "AlphaYield-v3"
+  },
+  "message": "Agent profile updated successfully."
+}
+```
+
+### Retrieve Skill Contract
 
 Endpoint: GET /.well-known/skill.md
 
----
+### Autonomous Onboard + Subscribe
 
-### Credit: Apply (Auto-Subscribe + Guarantee)
+Endpoint: POST /autonomous/onboard-subscribe
+
+Request:
+```json
+{
+  "idempotencyKey": "run-20260328-001",
+  "walletAddress": "0x...",
+  "email": "agent-operator@example.com",
+  "agentName": "AlphaYield-v3",
+  "agentType": "stablecoin",
+  "description": "optional",
+  "serviceUrl": "optional",
+  "tools": "optional",
+  "subscriptionTier": "pro",
+  "amount": 0.0001,
+  "recipient": "0x..."
+}
+```
+
+Response:
+```json
+{
+  "workflowId": "uuid",
+  "idempotencyKey": "run-20260328-001",
+  "mode": "autonomous",
+  "stages": {
+    "enroll": { "status": "completed" },
+    "profileUpdate": { "status": "completed" },
+    "subscriptionDecision": { "status": "completed" },
+    "creditApply": { "status": "completed" }
+  },
+  "finalStatus": "approved",
+  "idempotentReplay": false
+}
+```
+
+Replay behavior:
+- Same `idempotencyKey` returns cached result with `idempotentReplay: true`.
+
+### Credit Apply (Auto-Subscribe + Guarantee)
 
 Endpoint: POST /credit/apply
 
 Request:
 ```json
 {
-  "agentId": "string",
-  "recipient": "0x...",
-  "amount": 0.01
+  "agentId": "0x...",
+  "amount": 0.01,
+  "recipient": "0x..."
 }
 ```
 
@@ -124,87 +205,63 @@ Response (rejected):
 }
 ```
 
----
+### Credit Apply (Legacy Alias)
 
-### Credit: Repay and Grow
+Endpoint: POST /apply
+
+### Credit Repay
 
 Endpoint: POST /credit/repay
 
 Request:
 ```json
 {
-  "agentId": "string",
+  "agentId": "0x...",
   "creditId": "0x...",
   "amount": 0.0105
 }
 ```
 
----
-
-### Credit: Settle x402 Payload
+### Credit Settle x402 Payload
 
 Endpoint: POST /credit/settle
 
 Request:
 ```json
 {
-  "agentId": "string",
+  "agentId": "0x...",
   "creditId": "0x...",
   "x402PayloadHash": "0x..."
 }
 ```
 
----
-
-### Subscription: Check Status
+### Subscription Status
 
 Endpoint: POST /subscription/status
 
-Request:
-```json
-{
-  "agentId": "string"
-}
-```
-
----
-
-### Subscription: Subscribe
+### Subscription Subscribe
 
 Endpoint: POST /subscription/subscribe
 
 Request:
 ```json
 {
-  "agentId": "string",
   "duration": "30 days",
   "autoRenew": true
 }
 ```
 
----
-
-### Subscription: Renew
+### Subscription Renew
 
 Endpoint: POST /subscription/renew
 
-Request:
-```json
-{
-  "agentId": "string"
-}
-```
-
----
-
-### Guarantee: Issue Credit Guarantee
+### Issue Guarantee
 
 Endpoint: POST /guarantee
 
 Request:
 ```json
 {
-  "agentId": "string",
   "recipient": "0x...",
   "amount": 0.1,
   "service": "premium-price-feed",
@@ -236,54 +293,37 @@ Response (rejected):
 }
 ```
 
----
-
-### Pool: Status
+### Pool Status
 
 Endpoint: GET /pool/status
 
----
-
-### Pool: Fund
+### Pool Fund
 
 Endpoint: POST /pool/fund
 
 Request:
 ```json
 {
-  "agentId": "string",
+  "agentId": "0x...",
   "amount": 0.1
 }
 ```
 
----
-
-### Vault: Rebalance
+### Vault Rebalance
 
 Endpoint: POST /rebalance
 
 Request:
 ```json
 {
-  "vaultId": "string"
+  "vaultId": "vault-001"
 }
 ```
 
----
-
-### Risk: Score
+### Risk Score
 
 Endpoint: POST /risk-score
 
-Request:
-```json
-{
-  "agentId": "string"
-}
-```
-
----
-
-### Analytics: Volatility
+### Volatility Snapshot
 
 Endpoint: GET /volatility
