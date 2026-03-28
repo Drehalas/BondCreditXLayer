@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Coins, TrendingUp, Eye, Settings, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useBondCredit } from '../context/BondCreditContext';
@@ -19,11 +20,18 @@ interface AgentFormData {
   subscriptionTier: string;
 }
 
+const AGENT_TYPE_ICONS: Record<string, React.ReactNode> = {
+  stablecoin: <Coins size={20} color="#3bf7d2" />,
+  perpetual: <TrendingUp size={20} color="#bced62" />,
+  prediction: <Eye size={20} color="#7aa7ff" />,
+  other: <Settings size={20} color="#ffb066" />,
+};
+
 const AGENT_TYPES = [
-  { id: 'stablecoin', label: 'Stablecoin Strategy', icon: '🪙', desc: 'Yield optimization and stablecoin management' },
-  { id: 'perpetual', label: 'Perpetual Trader', icon: '📈', desc: 'Leverage trading and position management' },
-  { id: 'prediction', label: 'Prediction Market', icon: '🔮', desc: 'Event-driven prediction market trading' },
-  { id: 'other', label: 'Other', icon: '⚙️', desc: 'Custom agent type or multi-strategy' },
+  { id: 'stablecoin', label: 'Stablecoin Strategy', desc: 'Yield optimization and stablecoin management' },
+  { id: 'perpetual', label: 'Perpetual Trader', desc: 'Leverage trading and position management' },
+  { id: 'prediction', label: 'Prediction Market', desc: 'Event-driven prediction market trading' },
+  { id: 'other', label: 'Other', desc: 'Custom agent type or multi-strategy' },
 ];
 
 const STEPS = [
@@ -312,7 +320,7 @@ const CreatePage: React.FC = () => {
         >
           <div className="create-page__auto-hint-inner bc-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '1.25rem' }}>🤖</span>
+              <Bot size={20} color="#3bf7d2" />
               <span style={{ fontWeight: 600, color: 'var(--bondcredit-white)' }}>Autonomous Registration</span>
             </div>
             <p style={{ color: 'var(--bondcredit-s2)', fontSize: '0.875rem', margin: 0, lineHeight: 1.6 }}>
@@ -448,7 +456,7 @@ const Step2: React.FC<{ form: AgentFormData; update: (k: keyof AgentFormData, v:
             className={`create-type-card bc-card ${form.agentType === t.id ? 'selected' : ''}`}
             onClick={() => update('agentType', t.id)}
           >
-            <div className="create-type-card__icon">{t.icon}</div>
+            <div className="create-type-card__icon">{AGENT_TYPE_ICONS[t.id]}</div>
             <div className="create-type-card__label">{t.label}</div>
             <div className="create-type-card__desc">{t.desc}</div>
           </button>

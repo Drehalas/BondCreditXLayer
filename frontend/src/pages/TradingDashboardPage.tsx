@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Zap, BarChart3, Repeat, Shield, ArrowDownLeft, ArrowUpRight, Star } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
    MOCK DATA — will be replaced with live API data later
@@ -14,11 +15,18 @@ const WALLET_TOKENS = [
   { symbol: 'BTC', name: 'Bitcoin', amount: '0.0312', usd: '$2,934.80', change: '+5.1%', positive: true, sparkline: [30,32,35,33,38,42,40,45,48,52,55] },
 ];
 
+const MARKET_ICONS: Record<string, React.ReactNode> = {
+  'OKX DEX': <Zap size={18} color="#ffb066" />,
+  'OKX Market': <BarChart3 size={18} color="#7aa7ff" />,
+  'Uniswap V3': <Repeat size={18} color="#ff79c6" />,
+  'Aave V3': <Shield size={18} color="#bced62" />,
+};
+
 const MARKETS = [
-  { name: 'OKX DEX', pairs: '280+', volume: '$2.4B', icon: '⚡', status: 'Active' },
-  { name: 'OKX Market', pairs: '150+', volume: '$890M', icon: '📊', status: 'Active' },
-  { name: 'Uniswap V3', pairs: '500+', volume: '$1.8B', icon: '🦄', status: 'Active' },
-  { name: 'Aave V3', pairs: '45+', volume: '$340M', icon: '👻', status: 'Active' },
+  { name: 'OKX DEX', pairs: '280+', volume: '$2.4B', status: 'Active' },
+  { name: 'OKX Market', pairs: '150+', volume: '$890M', status: 'Active' },
+  { name: 'Uniswap V3', pairs: '500+', volume: '$1.8B', status: 'Active' },
+  { name: 'Aave V3', pairs: '45+', volume: '$340M', status: 'Active' },
 ];
 
 const TRADE_HISTORY = [
@@ -324,7 +332,7 @@ const TradingDashboardPage: React.FC = () => {
                 {MARKETS.map(m => (
                   <div key={m.name} className="dash-markets__item">
                     <div className="dash-markets__item-top">
-                      <span className="dash-markets__icon">{m.icon}</span>
+                      <span className="dash-markets__icon">{MARKET_ICONS[m.name]}</span>
                       <div className="dash-markets__status"><div className="dash-markets__dot" />{m.status}</div>
                     </div>
                     <div className="dash-markets__name">{m.name}</div>
@@ -493,10 +501,10 @@ const TradingDashboardPage: React.FC = () => {
                   transition={{ delay: 0.5 + i * 0.08 }}
                 >
                   <div className={`dash-txhist__icon dash-txhist__icon--${tx.type}`}>
-                    {tx.type === 'receive' && '↓'}
-                    {tx.type === 'send' && '↑'}
-                    {tx.type === 'fee' && '⚡'}
-                    {tx.type === 'credit' && '★'}
+                    {tx.type === 'receive' && <ArrowDownLeft size={14} />}
+                    {tx.type === 'send' && <ArrowUpRight size={14} />}
+                    {tx.type === 'fee' && <Zap size={14} />}
+                    {tx.type === 'credit' && <Star size={14} />}
                   </div>
                   <div className="dash-txhist__info">
                     <div className="dash-txhist__label">{tx.label}</div>

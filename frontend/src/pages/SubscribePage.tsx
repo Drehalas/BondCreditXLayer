@@ -1,151 +1,154 @@
-import React, { useState } from 'react';
-import { useBondCredit } from '../context/BondCreditContext';
-import type { SubscriptionStatus } from '../../../src/index';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import MachineReadableSection from '../components/MachineReadableSection';
 
 const SubscribePage: React.FC = () => {
-  const { log, appendLog } = useBondCredit();
-  const [duration, setDuration] = useState('30 days');
-  const [autoRenew, setAutoRenew] = useState(true);
-  const [walletAddress, setWalletAddress] = useState('');
-  const [manualBusy, setManualBusy] = useState(false);
-  const [renewBusy, setRenewBusy] = useState(false);
-  const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(null);
-  const [apiError, setApiError] = useState('');
+  const skillSnippet = `# Subscribe: Agent Enrollment & Subscription
+POST /subscription/subscribe
+{
+  "agentId": "string",
+  "duration": "30 days",
+  "autoRenew": true
+}
 
-  const apiBase = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
+# Status: Check Subscription
+POST /subscription/status
+{ "agentId": "string" }
 
-  async function postJson(path: string, body: Record<string, unknown>) {
-    const response = await fetch(`${apiBase}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    const json = await response.json().catch(() => null);
-    if (!response.ok) {
-      const message = typeof json?.error === 'string' ? json.error : `Request failed (${response.status})`;
-      throw new Error(message);
-    }
-
-    return json;
-  }
-
-  async function handleManualSubscribe() {
-    try {
-      setApiError('');
-      setManualBusy(true);
-      if (!walletAddress) {
-        throw new Error('Enter wallet address before subscribe.');
-      }
-
-      const res = await postJson('/subscription/subscribe', {
-        agentId: walletAddress,
-        duration,
-        autoRenew,
-      });
-      appendLog(`subscription.subscribe.backend(): ${JSON.stringify(res, null, 2)}`);
-      // No automatic status check here
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Subscribe failed';
-      setApiError(message);
-      appendLog(`subscription.subscribe.backend.error(): ${message}`);
-    } finally {
-      setManualBusy(false);
-    }
-  }
-
-  async function handleCheckStatus() {
-    try {
-      setApiError('');
-      if (!walletAddress) {
-        throw new Error('Enter wallet address before checking status.');
-      }
-
-      const res = await postJson('/subscription/status', { agentId: walletAddress });
-      setSubStatus((res?.subscription as SubscriptionStatus) ?? null);
-      appendLog(`subscription.status.backend(): ${JSON.stringify(res, null, 2)}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Check status failed';
-      setApiError(message);
-      appendLog(`subscription.status.error(): ${message}`);
-    }
-  }
-
-  async function handleRenew() {
-    try {
-      setApiError('');
-      setRenewBusy(true);
-      if (!walletAddress) {
-        throw new Error('Enter wallet address before renew.');
-      }
-
-      const res = await postJson('/subscription/renew', { agentId: walletAddress });
-      appendLog(`subscription.renew.backend(): ${JSON.stringify(res, null, 2)}`);
-      await handleCheckStatus();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Renew failed';
-      setApiError(message);
-      appendLog(`subscription.renew.backend.error(): ${message}`);
-    } finally {
-      setRenewBusy(false);
-    }
-  }
-
-  const skillSnippet = `# UI Flow: Backend Subscription API
-# 1) Enter wallet address
-# 2) Call backend /subscription/subscribe or /subscription/renew
-# 3) Read status via backend /subscription/status`;
+# Renew: Extend Subscription
+POST /subscription/renew
+{ "agentId": "string" }`;
 
   return (
-    <main className="wt-container" style={{ marginTop: '88px', maxWidth: '900px' }}>
-    <div className="bc-stack">
-      <section className="bc-card">
-        <h2>Subscription</h2>
-        <div className="bc-grid2">
-          <label>
-            Wallet Address
-            <input
-              value={walletAddress}
-              onChange={e => setWalletAddress(e.target.value.trim())}
-              placeholder="0x..."
-            />
-          </label>
-          <label>
-            Duration
-            <input value={duration} onChange={e => setDuration(e.target.value)} />
-          </label>
-          <label className="bc-check">
-            <input type="checkbox" checked={autoRenew} onChange={e => setAutoRenew(e.target.checked)} />
-            Auto-renew
-          </label>
-        </div>
-        <div className="bc-actions">
-          <button className="bc-btn bc-btnPrimary" onClick={handleManualSubscribe} disabled={manualBusy || !walletAddress}>
-            {manualBusy ? 'Submitting...' : 'Subscribe'}
-          </button>
-          {/* <button className="bc-btn" onClick={handleCheckStatus}>Check status</button> */}
-          {/* <button className="bc-btn" onClick={handleRenew} disabled={renewBusy || !walletAddress}>
-            {renewBusy ? 'Renewing...' : 'Renew'}
-          </button> */}
-        </div>
-        {!!apiError && <p style={{ marginTop: '10px', color: '#ff7d7d' }}>{apiError}</p>}
-        {subStatus && (
-          <pre className="bc-pre">{JSON.stringify(subStatus, null, 2)}</pre>
-        )}
-      </section>
+    <main className="wt-container" style={{ marginTop: '88px', maxWidth: '960px' }}>
+      <div className="bc-stack">
 
-      <div className="bc-console bc-card">
-        <h2>Console</h2>
-        <pre className="bc-pre bc-preConsole">{log || 'No events yet.'}</pre>
+        {/* ── Hero ── */}
+        <section className="bc-card" style={{ padding: '40px 36px' }}>
+          <span className="info-badge">Subscription</span>
+          <h2 className="info-hero__title">x402-Powered Agent Subscriptions</h2>
+          <p className="info-hero__desc">
+            Subscribe your agent to BondCredit to unlock on-chain credit capabilities. 
+            Subscriptions are paid via the x402 payment protocol — automated, verifiable, 
+            and fully agent-compatible.
+          </p>
+          <Link to="/create" className="bc-btn bc-btnPrimary" style={{ textDecoration: 'none', marginTop: '20px', display: 'inline-block' }}>
+            Register an Agent →
+          </Link>
+        </section>
+
+        {/* ── How It Works ── */}
+        <section className="bc-card" style={{ padding: '32px 36px' }}>
+          <h3 className="info-section__title">How Subscriptions Work</h3>
+          <div className="info-steps">
+            <div className="info-step">
+              <div className="info-step__num">1</div>
+              <div>
+                <div className="info-step__label">Register</div>
+                <p className="info-step__desc">Create an agent wallet and provide identity through the registration wizard.</p>
+              </div>
+            </div>
+            <div className="info-step">
+              <div className="info-step__num">2</div>
+              <div>
+                <div className="info-step__label">Subscribe</div>
+                <p className="info-step__desc">Choose a plan (Free, Pro, or Enterprise). Payment is processed via x402 — automated and on-chain.</p>
+              </div>
+            </div>
+            <div className="info-step">
+              <div className="info-step__num">3</div>
+              <div>
+                <div className="info-step__label">Trade & Earn</div>
+                <p className="info-step__desc">Access market venues, execute trades, and build your credit score over time.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Plans ── */}
+        <section className="bc-card" style={{ padding: '32px 36px' }}>
+          <h3 className="info-section__title">Subscription Plans</h3>
+          <div className="info-plans">
+            <div className="info-plan">
+              <div className="info-plan__name">Free</div>
+              <div className="info-plan__price">$0</div>
+              <ul className="info-plan__features">
+                <li><span className="info-check">✓</span> Basic credit scoring</li>
+                <li><span className="info-check">✓</span> 1 market venue</li>
+                <li><span className="info-check">✓</span> Community support</li>
+              </ul>
+            </div>
+            <div className="info-plan info-plan--popular">
+              <div className="info-plan__badge">Popular</div>
+              <div className="info-plan__name">Pro</div>
+              <div className="info-plan__price">$9.99<span>/mo</span></div>
+              <ul className="info-plan__features">
+                <li><span className="info-check">✓</span> Advanced credit scoring</li>
+                <li><span className="info-check">✓</span> All market venues</li>
+                <li><span className="info-check">✓</span> Priority support</li>
+                <li><span className="info-check">✓</span> Auto-renew via x402</li>
+              </ul>
+            </div>
+            <div className="info-plan">
+              <div className="info-plan__name">Enterprise</div>
+              <div className="info-plan__price">Custom</div>
+              <ul className="info-plan__features">
+                <li><span className="info-check">✓</span> Unlimited agents</li>
+                <li><span className="info-check">✓</span> Custom credit limits</li>
+                <li><span className="info-check">✓</span> Dedicated support</li>
+                <li><span className="info-check">✓</span> SLA guarantees</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Ecosystem ── */}
+        <section className="bc-card" style={{ padding: '32px 36px' }}>
+          <span className="info-badge" style={{ background: 'rgba(188,237,98,0.08)', color: '#bced62', borderColor: 'rgba(188,237,98,0.15)' }}>Ecosystem</span>
+          <h3 className="info-section__title" style={{ marginTop: '8px' }}>Integrations that unlock instant access</h3>
+          <p className="info-hero__desc" style={{ marginBottom: '20px' }}>
+            Verify your identity or connect a wallet to skip pre-qualification and start trading immediately.
+          </p>
+          <div className="info-integrations">
+            <div className="info-integration info-integration--featured">
+              <div className="info-integration__tag">Identity Verification</div>
+              <h4 className="info-integration__name">World ID</h4>
+              <p className="info-integration__desc">Verify the human behind your agent with World ID to receive instant credit. No pre-qualification wait.</p>
+              <ul className="info-integration__checks">
+                <li><span className="info-check">✓</span> Human verification</li>
+                <li><span className="info-check">✓</span> Sybil protection</li>
+                <li><span className="info-check">✓</span> Skip pre-qualification</li>
+                <li><span className="info-check">✓</span> Built-in to dashboard</li>
+              </ul>
+            </div>
+            <div className="info-integration">
+              <div className="info-integration__tag" style={{ background: 'rgba(59,247,210,0.06)', color: '#3bf7d2' }}>Instant Credit</div>
+              <h4 className="info-integration__name">Wallet Funding</h4>
+              <p className="info-integration__desc">Fund a wallet to get instant credit. Repay directly via USDC on X Layer. Agent-native.</p>
+              <ul className="info-integration__checks">
+                <li><span className="info-check">✓</span> Instant credit</li>
+                <li><span className="info-check">✓</span> Wallet repayment</li>
+                <li><span className="info-check">✓</span> Agent-native</li>
+              </ul>
+            </div>
+            <div className="info-stat-card">
+              <div className="info-stat__value">$5</div>
+              <div className="info-stat__label">Instant Credit</div>
+            </div>
+            <div className="info-stat-card">
+              <div className="info-stat__value">2</div>
+              <div className="info-stat__label">Integrations</div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Machine Readable ── */}
+        <MachineReadableSection
+          title="Machine Readable"
+          description="This page exposes enrollment and subscription capabilities for Agents."
+          codeSnippet={skillSnippet}
+        />
       </div>
-
-      <MachineReadableSection 
-        title="Machine Readable"
-        description="This page exposes enrollment and subscription capabilities for Agents."
-        codeSnippet={skillSnippet}
-      />
-    </div>
     </main>
   );
 };
