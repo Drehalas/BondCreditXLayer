@@ -94,7 +94,7 @@
   border-radius: 16px;
   padding: 20px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .dash-card::before {
@@ -491,6 +491,7 @@
   outline: none;
   transition: border-color 200ms ease;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .dash-trade__select:focus,
