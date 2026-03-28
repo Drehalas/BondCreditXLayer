@@ -89,7 +89,7 @@
 
 /* ── Shared Card ── */
 .dash-card {
-  background: linear-gradient(180deg, rgba(18,22,40,0.85), rgba(18,22,40,0.55));
+  background: rgba(14, 14, 14, 0.85);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 16px;
   padding: 20px;
@@ -130,7 +130,7 @@
 @media (max-width: 500px) { .dash-token-row { grid-template-columns: 1fr; } }
 
 .dash-token-card {
-  background: linear-gradient(180deg, rgba(18,22,40,0.9), rgba(18,22,40,0.6));
+  background: rgba(14, 14, 14, 0.9);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 14px;
   padding: 16px;
@@ -144,7 +144,7 @@
 }
 
 .dash-token-card--accent {
-  background: linear-gradient(135deg, rgba(59,247,210,0.12) 0%, rgba(18,22,40,0.9) 60%);
+  background: linear-gradient(135deg, rgba(59,247,210,0.08) 0%, rgba(14,14,14,0.9) 60%);
   border-color: rgba(59,247,210,0.15);
 }
 
