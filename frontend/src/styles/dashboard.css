@@ -93,24 +93,13 @@
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 16px;
   padding: 20px;
-  position: relative;
-  overflow: visible;
+  transition: border-color 250ms ease, box-shadow 250ms ease;
 }
 
-.dash-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: conic-gradient(from 180deg, rgba(59,247,210,0.2), rgba(122,167,255,0.15), transparent);
-  opacity: 0;
-  transition: opacity 250ms ease;
-  pointer-events: none;
-  z-index: 0;
+.dash-card:hover {
+  border-color: rgba(59,247,210,0.22);
+  box-shadow: 0 0 20px rgba(59,247,210,0.05);
 }
-
-.dash-card:hover::before { opacity: 0.5; }
-.dash-card > * { position: relative; z-index: 1; }
 
 .dash-card__header {
   display: flex;

@@ -92,28 +92,12 @@
   border-radius: 18px;
   box-shadow: 0 20px 80px var(--shadow);
   padding: 16px;
-  overflow: visible;
+  transition: border-color 250ms ease, box-shadow 250ms ease;
 }
 
-.bc-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: conic-gradient(from 180deg, rgba(59, 247, 210, 0.35), rgba(122, 167, 255, 0.25), rgba(255, 255, 255, 0));
-  opacity: 0;
-  transition: opacity 200ms ease;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.bc-card:hover::before {
-  opacity: 0.7;
-}
-
-.bc-card > * {
-  position: relative;
-  z-index: 1;
+.bc-card:hover {
+  border-color: rgba(59, 247, 210, 0.25);
+  box-shadow: 0 0 24px rgba(59, 247, 210, 0.06), 0 20px 80px var(--shadow);
 }
 
 .bc-card h2 {
