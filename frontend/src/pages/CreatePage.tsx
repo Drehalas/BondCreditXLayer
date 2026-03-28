@@ -699,7 +699,7 @@ const Step4: React.FC<{ form: AgentFormData; onBack: () => void }> = ({ form, on
 
       <div className="create-slide__actions" style={{ marginTop: '24px' }}>
         <button className="bc-btn create-slide__back" onClick={onBack}>← Back</button>
-        <Link to="/analytics" className="bc-btn bc-btnPrimary create-slide__next" style={{ textDecoration: 'none' }}>
+        <Link to="/dashboard" className="bc-btn bc-btnPrimary create-slide__next" style={{ textDecoration: 'none' }}>
           Go to Full Dashboard →
         </Link>
       </div>

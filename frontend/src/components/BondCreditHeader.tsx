@@ -14,6 +14,7 @@ const BondCreditHeader: React.FC<BondCreditHeaderProps> = ({ connected, onRegist
     { href: '/guarantee', label: 'Guarantee' },
     { href: '/credit', label: 'Credit' },
     { href: '/create', label: 'Create' },
+    { href: '/dashboard', label: 'Dashboard' },
   ];
 
   const navLinkStyle = {

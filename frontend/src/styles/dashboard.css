@@ -1,0 +1,876 @@
+/* ═══════════════════════════════════════════════════════════════
+   Trading Dashboard — Premium Crypto UI
+   Inspired by Critso + CoinEx patterns
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Layout ── */
+.dash-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 28px 80px;
+}
+
+.dash-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+}
+
+.dash-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.dash-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .dash-layout { grid-template-columns: 1fr; }
+  .dash-sidebar { display: grid; grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 680px) {
+  .dash-sidebar { grid-template-columns: 1fr; }
+  .dash-page { padding: 16px 12px 60px; }
+}
+
+/* ── Top Bar ── */
+.dash-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dash-topbar__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--bondcredit-white);
+}
+
+.dash-topbar__sub {
+  font-size: 0.8125rem;
+  color: var(--bondcredit-s2);
+  margin: 2px 0 0;
+}
+
+.dash-topbar__right { display: flex; align-items: center; gap: 12px; }
+
+.dash-topbar__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #3bf7d2;
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid rgba(59,247,210,0.2);
+  background: rgba(59,247,210,0.04);
+}
+
+.dash-topbar__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #3bf7d2;
+  box-shadow: 0 0 8px rgba(59,247,210,0.5);
+  animation: dash-blink 2s ease-in-out infinite;
+}
+
+@keyframes dash-blink {
+  0%,100% { opacity: 1; } 50% { opacity: 0.35; }
+}
+
+/* ── Shared Card ── */
+.dash-card {
+  background: linear-gradient(180deg, rgba(18,22,40,0.85), rgba(18,22,40,0.55));
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.dash-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(from 180deg, rgba(59,247,210,0.2), rgba(122,167,255,0.15), transparent);
+  opacity: 0;
+  transition: opacity 250ms ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dash-card:hover::before { opacity: 0.5; }
+.dash-card > * { position: relative; z-index: 1; }
+
+.dash-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.dash-card__title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--bondcredit-s2);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════════
+   Token Price Cards (Critso-style)
+   ═══════════════════════════════════════════════ */
+.dash-token-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) { .dash-token-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .dash-token-row { grid-template-columns: 1fr; } }
+
+.dash-token-card {
+  background: linear-gradient(180deg, rgba(18,22,40,0.9), rgba(18,22,40,0.6));
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 16px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  cursor: default;
+}
+
+.dash-token-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(59,247,210,0.2);
+}
+
+.dash-token-card--accent {
+  background: linear-gradient(135deg, rgba(59,247,210,0.12) 0%, rgba(18,22,40,0.9) 60%);
+  border-color: rgba(59,247,210,0.15);
+}
+
+.dash-token-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.dash-token-card__icon {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: rgba(59,247,210,0.1);
+  border: 1px solid rgba(59,247,210,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.75rem; color: #3bf7d2;
+}
+
+.dash-token-card__price {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--bondcredit-white);
+  margin-bottom: 4px;
+}
+
+.dash-token-card__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dash-token-card__sym {
+  font-size: 0.6875rem;
+  color: var(--bondcredit-s2);
+  font-weight: 600;
+}
+
+.dash-token-card__change {
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.dash-token-card__change.up { color: #3bf7d2; }
+.dash-token-card__change.down { color: #ff4d6d; }
+
+/* ═══════════════════════════════════════════════
+   Portfolio Chart + Credit Score Row
+   ═══════════════════════════════════════════════ */
+.dash-chart-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) { .dash-chart-row { grid-template-columns: 1fr; } }
+
+/* Portfolio Chart */
+.dash-portfolio__val {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.dash-portfolio__amount {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--bondcredit-white);
+}
+
+.dash-portfolio__change {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3bf7d2;
+}
+
+.dash-portfolio__periods {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+
+.dash-portfolio__period {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bondcredit-s2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: inherit;
+}
+
+.dash-portfolio__period.active {
+  background: rgba(59,247,210,0.12);
+  color: #3bf7d2;
+}
+
+.dash-portfolio__chart {
+  margin: 12px -20px 0;
+}
+
+.dash-portfolio__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.625rem;
+  color: var(--bondcredit-s2);
+  margin-top: 6px;
+  padding: 0 4px;
+}
+
+/* ═══════════════════════════════════════════════
+   Credit Score Gauge
+   ═══════════════════════════════════════════════ */
+.dash-credit__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #3bf7d2;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(59,247,210,0.08);
+}
+
+.dash-gauge {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 8px 0 16px;
+}
+
+.dash-gauge__value {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dash-gauge__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Credit Factors */
+.dash-credit__factors {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-credit__factor-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--bondcredit-s2);
+  margin-bottom: 4px;
+}
+
+.dash-credit__factor-top span:last-child {
+  font-weight: 700;
+  color: var(--bondcredit-white);
+}
+
+.dash-credit__factor-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.dash-credit__factor-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3bf7d2, #bced62);
+}
+
+/* ═══════════════════════════════════════════════
+   Market Access + Trade Panel Row
+   ═══════════════════════════════════════════════ */
+.dash-trade-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) { .dash-trade-row { grid-template-columns: 1fr; } }
+
+/* Market Access */
+.dash-markets__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.dash-markets__item {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.dash-markets__item:hover {
+  border-color: rgba(59,247,210,0.18);
+  transform: translateY(-2px);
+}
+
+.dash-markets__item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.dash-markets__icon { font-size: 1.125rem; }
+
+.dash-markets__status {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.5625rem; font-weight: 600; color: #3bf7d2;
+}
+
+.dash-markets__dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #3bf7d2;
+  box-shadow: 0 0 6px rgba(59,247,210,0.4);
+}
+
+.dash-markets__name {
+  font-weight: 700; font-size: 0.8125rem;
+  color: var(--bondcredit-white); margin-bottom: 3px;
+}
+
+.dash-markets__info {
+  display: flex; justify-content: space-between;
+  font-size: 0.625rem; color: var(--bondcredit-s2);
+  margin-bottom: 10px;
+}
+
+.dash-markets__vol { font-weight: 600; }
+
+.dash-markets__btn {
+  width: 100%;
+  padding: 7px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(59,247,210,0.35);
+  background: rgba(59,247,210,0.08);
+  color: #3bf7d2;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: inherit;
+}
+
+.dash-markets__btn:hover {
+  background: rgba(59,247,210,0.18);
+}
+
+/* ═══════════════════════════════════════════════
+   Trade Panel
+   ═══════════════════════════════════════════════ */
+.dash-trade__tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.05);
+  margin: 12px 0 16px;
+}
+
+.dash-trade__tab {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bondcredit-s2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: inherit;
+}
+
+.dash-trade__tab:hover { color: var(--bondcredit-white); }
+.dash-trade__tab.active.green { background: rgba(59,247,210,0.12); color: #3bf7d2; }
+.dash-trade__tab.active.red { background: rgba(255,77,109,0.12); color: #ff4d6d; }
+.dash-trade__tab.active:not(.green):not(.red) { background: rgba(59,247,210,0.12); color: #3bf7d2; }
+
+.dash-trade__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dash-trade__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.6875rem;
+  color: var(--bondcredit-s2);
+  font-weight: 500;
+}
+
+.dash-trade__select,
+.dash-trade__input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.3);
+  color: var(--bondcredit-white);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 200ms ease;
+  -webkit-appearance: none;
+}
+
+.dash-trade__select:focus,
+.dash-trade__input:focus {
+  border-color: rgba(59,247,210,0.3);
+}
+
+.dash-trade__input-wrap {
+  position: relative;
+}
+
+.dash-trade__input-wrap .dash-trade__input {
+  padding-right: 52px;
+}
+
+.dash-trade__suffix {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--bondcredit-s2);
+}
+
+.dash-trade__exec {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: inherit;
+  margin-top: 4px;
+}
+
+.dash-trade__exec--green {
+  background: linear-gradient(135deg, rgba(59,247,210,0.2) 0%, rgba(59,247,210,0.08) 100%);
+  border: 1px solid rgba(59,247,210,0.35);
+  color: #3bf7d2;
+}
+
+.dash-trade__exec--green:hover { background: rgba(59,247,210,0.25); }
+
+.dash-trade__exec--red {
+  background: linear-gradient(135deg, rgba(255,77,109,0.2) 0%, rgba(255,77,109,0.06) 100%);
+  border: 1px solid rgba(255,77,109,0.35);
+  color: #ff4d6d;
+}
+
+.dash-trade__exec--red:hover { background: rgba(255,77,109,0.25); }
+
+.dash-trade__hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.6875rem;
+  color: var(--bondcredit-s2);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(59,247,210,0.03);
+  border: 1px dashed rgba(59,247,210,0.12);
+}
+
+/* ═══════════════════════════════════════════════
+   Orders Table (CoinEx-inspired)
+   ═══════════════════════════════════════════════ */
+.dash-orders__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.dash-orders__tabs {
+  display: flex;
+  gap: 0;
+}
+
+.dash-orders__tab {
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  color: var(--bondcredit-s2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: inherit;
+  position: relative;
+}
+
+.dash-orders__tab.active {
+  color: #3bf7d2;
+}
+
+.dash-orders__tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: #3bf7d2;
+  border-radius: 2px;
+}
+
+.dash-orders__count {
+  font-size: 0.625rem;
+  color: var(--bondcredit-s2);
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.dash-orders__table { display: flex; flex-direction: column; }
+
+.dash-orders__thead,
+.dash-orders__row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.7fr 0.7fr 1fr 1fr 0.9fr 0.6fr 0.7fr;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  align-items: center;
+}
+
+.dash-orders__thead {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bondcredit-s2);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-weight: 600;
+}
+
+.dash-orders__row {
+  color: var(--bondcredit-white);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 150ms ease;
+}
+
+.dash-orders__row:hover { background: rgba(59,247,210,0.025); }
+.dash-orders__pair { font-weight: 700; }
+.dash-orders__time { color: var(--bondcredit-s2); }
+.dash-orders__status { color: #3bf7d2; font-weight: 600; }
+
+@media (max-width: 768px) {
+  .dash-orders__thead,
+  .dash-orders__row {
+    grid-template-columns: repeat(4, 1fr);
+    font-size: 0.6875rem;
+  }
+  .dash-orders__thead span:nth-child(n+5),
+  .dash-orders__row span:nth-child(n+5) { display: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   CTA
+   ═══════════════════════════════════════════════ */
+.dash-cta {
+  border: 1px dashed rgba(59,247,210,0.18) !important;
+  background: rgba(59,247,210,0.015) !important;
+}
+
+.dash-cta__inner {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.dash-cta__icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: rgba(59,247,210,0.08);
+  border: 1px solid rgba(59,247,210,0.15);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-cta__title {
+  font-size: 1rem; font-weight: 700;
+  color: var(--bondcredit-white); margin: 0 0 6px;
+}
+
+.dash-cta__desc {
+  font-size: 0.8125rem; color: var(--bondcredit-s2);
+  line-height: 1.6; margin: 0 0 6px;
+}
+
+.dash-cta__vision {
+  font-size: 0.75rem; color: #3bf7d2;
+  line-height: 1.6; margin: 0;
+  font-style: italic; opacity: 0.85;
+}
+
+@media (max-width: 600px) {
+  .dash-cta__inner { flex-direction: column; }
+}
+
+/* ═══════════════════════════════════════════════
+   Transaction History Sidebar (CoinEx-inspired)
+   ═══════════════════════════════════════════════ */
+.dash-txhist__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 14px;
+}
+
+.dash-txhist__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.dash-txhist__item:last-child { border-bottom: none; }
+
+.dash-txhist__icon {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.875rem; flex-shrink: 0;
+}
+
+.dash-txhist__icon--receive {
+  background: rgba(59,247,210,0.1);
+  color: #3bf7d2;
+  border: 1px solid rgba(59,247,210,0.15);
+}
+
+.dash-txhist__icon--send {
+  background: rgba(255,77,109,0.1);
+  color: #ff4d6d;
+  border: 1px solid rgba(255,77,109,0.15);
+}
+
+.dash-txhist__icon--fee {
+  background: rgba(255,140,66,0.1);
+  color: #ff8c42;
+  border: 1px solid rgba(255,140,66,0.15);
+}
+
+.dash-txhist__icon--credit {
+  background: rgba(188,237,98,0.1);
+  color: #bced62;
+  border: 1px solid rgba(188,237,98,0.15);
+}
+
+.dash-txhist__info { flex: 1; min-width: 0; }
+
+.dash-txhist__label {
+  font-size: 0.8125rem; font-weight: 600;
+  color: var(--bondcredit-white);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.dash-txhist__time {
+  font-size: 0.625rem;
+  color: var(--bondcredit-s2);
+  margin-top: 1px;
+}
+
+.dash-txhist__amount {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dash-txhist__amount.positive { color: #3bf7d2; }
+.dash-txhist__amount.negative { color: #ff4d6d; }
+
+.dash-txhist__see-all {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(59,247,210,0.2);
+  background: rgba(59,247,210,0.04);
+  color: #3bf7d2;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: inherit;
+}
+
+.dash-txhist__see-all:hover { background: rgba(59,247,210,0.12); }
+
+/* ═══════════════════════════════════════════════
+   Wallet Mini (Sidebar)
+   ═══════════════════════════════════════════════ */
+.dash-wallet-mini__total {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--bondcredit-white);
+  margin: 10px 0 2px;
+}
+
+.dash-wallet-mini__sub {
+  font-size: 0.6875rem;
+  color: var(--bondcredit-s2);
+  margin-bottom: 14px;
+}
+
+.dash-wallet-mini__tokens {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.dash-wallet-mini__token {
+  display: grid;
+  grid-template-columns: 24px auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+.dash-wallet-mini__token-icon {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(59,247,210,0.08);
+  border: 1px solid rgba(59,247,210,0.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.5625rem; font-weight: 800; color: #3bf7d2;
+}
+
+.dash-wallet-mini__token-sym {
+  font-size: 0.75rem; font-weight: 700; color: var(--bondcredit-white);
+}
+
+.dash-wallet-mini__token-amt {
+  font-size: 0.6875rem; color: var(--bondcredit-s2);
+  text-align: right;
+}
+
+.dash-wallet-mini__token-chg {
+  font-size: 0.625rem; font-weight: 600;
+}
+
+.dash-wallet-mini__token-chg.up { color: #3bf7d2; }
+.dash-wallet-mini__token-chg.down { color: #ff4d6d; }
+
+.dash-wallet-mini__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dash-wallet-mini__btn {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.18);
+  color: var(--bondcredit-s2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: inherit;
+}
+
+.dash-wallet-mini__btn:hover {
+  border-color: rgba(59,247,210,0.2);
+  color: var(--bondcredit-white);
+}
+
+.dash-wallet-mini__btn--primary {
+  background: rgba(59,247,210,0.08);
+  border-color: rgba(59,247,210,0.25);
+  color: #3bf7d2;
+}
+
+.dash-wallet-mini__btn--primary:hover {
+  background: rgba(59,247,210,0.18);
+}

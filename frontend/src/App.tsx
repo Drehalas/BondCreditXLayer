@@ -8,6 +8,7 @@ import { RegisterAgent } from './components/RegisterAgent';
 import { AnimatePresence } from 'framer-motion';
 import './styles/app.css';
 import './styles/create.css';
+import './styles/dashboard.css';
 
 function AppContent() {
   const { showRegister, setShowRegister } = useBondCredit();
