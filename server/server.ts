@@ -5,6 +5,7 @@ import guaranteeRoutes from './routes/guarantee.js';
 import rebalanceRoutes from './routes/rebalance.js';
 import analyticsRoutes from './routes/analytics.js';
 import agentFlowRoutes from './routes/agentFlow';
+import tradeRoutes from './routes/trade.js';
 import type { NextFunction, Request, Response } from 'express';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -73,6 +74,7 @@ app.use(guaranteeRoutes);
 app.use(rebalanceRoutes);
 app.use(analyticsRoutes);
 app.use(agentFlowRoutes);
+app.use(tradeRoutes);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = err instanceof Error ? err.message : 'Unknown error';

@@ -8,17 +8,104 @@ datasource db {
 }
 
 model Agent {
-  id            Int      @id @default(autoincrement())
-  walletAddress String   @unique
-  email         String?
+  id                    Int                @id @default(autoincrement())
+  walletAddress         String             @unique
+  email                 String?
 
-  agentName     String?
-  description   String?
-  agentType     String?
+  agentName             String?
+  description           String?
+  agentType             String?
 
-  serviceUrl    String?
-  tools         Json?
+  serviceUrl            String?
+  tools                 Json?
+  agenticWalletProvider String?
+  agenticWalletLabel    String?
+  agenticWalletRegistered Boolean         @default(false)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  creditScore           Int                @default(0)
+  successfulTrades      Int                @default(0)
+  failedTrades          Int                @default(0)
+  creditLineUnlocked    Boolean            @default(false)
+  bonusUsd100Unlocked   Boolean            @default(false)
+
+  tradeExecutions       TradeExecution[]
+  creditScoreEvents     CreditScoreEvent[]
+  creditUnlockEvents    CreditUnlockEvent[]
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+}
+
+model TradeExecution {
+  id           Int                @id @default(autoincrement())
+  agentId      Int
+  pair         String
+  side         TradeSide
+  amount       Float
+  status       TradeExecutionStatus
+  txHash       String?
+  pnlDelta     Float?
+  errorMessage String?
+  metadata     Json?
+  executedAt   DateTime           @default(now())
+  createdAt    DateTime           @default(now())
+
+  agent        Agent              @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  scoreEvents  CreditScoreEvent[]
+
+  @@index([agentId, createdAt])
+  @@index([status, createdAt])
+}
+
+model CreditScoreEvent {
+  id                   Int           @id @default(autoincrement())
+  agentId              Int
+  tradeExecutionId     Int?
+  delta                Int
+  reason               String
+  scoreBefore          Int
+  scoreAfter           Int
+  successfulTradesAfter Int
+  failedTradesAfter    Int
+  createdAt            DateTime      @default(now())
+
+  agent                Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tradeExecution       TradeExecution? @relation(fields: [tradeExecutionId], references: [id], onDelete: SetNull)
+
+  @@index([agentId, createdAt])
+  @@index([tradeExecutionId])
+}
+
+model CreditUnlockEvent {
+  id                     Int             @id @default(autoincrement())
+  agentId                Int
+  type                   CreditUnlockType
+  threshold              Int
+  scoreAtUnlock          Int
+  successfulTradesAtUnlock Int
+  details                Json?
+  createdAt              DateTime        @default(now())
+
+  agent                  Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, type])
+  @@index([agentId, createdAt])
+}
+
+enum TradeExecutionStatus {
+  SUCCESS
+  FAILED
+}
+
+enum TradeSide {
+  BUY
+  SELL
+  LONG
+  SHORT
+  DEPOSIT
+}
+
+enum CreditUnlockType {
+  CREDIT_LINE_SCORE_10
+  BONUS_USD_100_AFTER_5_WINS
 }

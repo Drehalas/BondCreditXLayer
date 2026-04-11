@@ -157,6 +157,7 @@ router.post('/enroll', async (req: Request, res: Response, next: NextFunction) =
           ...(hasAgentType ? { agentType: normalizedAgentType } : {}),
           ...(hasServiceUrl ? { serviceUrl: normalizedServiceUrl } : {}),
           ...(hasTools ? { tools: normalizedTools } : {}),
+          agenticWalletRegistered: true,
         },
         create: {
           walletAddress: normalizedWalletAddress,
@@ -166,6 +167,7 @@ router.post('/enroll', async (req: Request, res: Response, next: NextFunction) =
           agentType: normalizedAgentType,
           serviceUrl: normalizedServiceUrl,
           tools: normalizedTools,
+          agenticWalletRegistered: true,
         },
       });
       
@@ -408,6 +410,7 @@ router.post('/autonomous/onboard-subscribe', async (req: Request, res: Response,
             description: normalizedDescription,
             agentType: normalizedAgentType,
             serviceUrl: normalizedServiceUrl,
+            agenticWalletRegistered: true,
             ...toolsPatch,
           },
           create: {
@@ -417,6 +420,7 @@ router.post('/autonomous/onboard-subscribe', async (req: Request, res: Response,
             description: normalizedDescription,
             agentType: normalizedAgentType,
             serviceUrl: normalizedServiceUrl,
+            agenticWalletRegistered: true,
             ...toolsPatch,
           },
         });

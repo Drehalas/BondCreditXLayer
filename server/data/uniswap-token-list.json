@@ -1,0 +1,724 @@
+[
+    {
+        "chain": "BTC",
+        "fullName": "Bitcoin",
+        "shortName": "BTC",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686558172927.png",
+        "order": 1,
+        "isNew": false,
+        "indexPageUrl": "bitcoin",
+        "column": 1,
+        "belong": "utxo",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/cf8e5b4f-79c4-48bd-bd54-e1b90d5223ab.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/bitcoin"
+    },
+    {
+        "chain": "ETH",
+        "fullName": "Ethereum",
+        "shortName": "ETH",
+        "logo": "https://static.oklink.com/cdn/assets/imgs/234/394F7F0E5AA398F0.png",
+        "order": 2,
+        "isNew": false,
+        "indexPageUrl": "ethereum",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/5d41d220-9ca3-4c67-b08e-942d7d5ba007.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/ethereum"
+    },
+    {
+        "chain": "X1",
+        "fullName": "X Layer",
+        "shortName": "X Layer",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1711680841142.png/type=png_350_0",
+        "order": 3,
+        "isNew": false,
+        "indexPageUrl": "x-layer",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/3839f7c1-4c82-481f-ae6a-dd82327bc492.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/x-layer"
+    },
+    {
+        "chain": "SOLANA",
+        "fullName": "Solana",
+        "shortName": "Solana",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1715241932682.png/type=png_350_0",
+        "order": 4,
+        "isNew": false,
+        "indexPageUrl": "solana",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/f6db1562-5f52-40ed-9e1a-04b74144957d.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/solana"
+    },
+    {
+        "chain": "TRON",
+        "fullName": "TRON",
+        "shortName": "TRON",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686557723420.png",
+        "order": 5,
+        "isNew": false,
+        "indexPageUrl": "tron",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/c61be36e-8fee-4162-bce2-7c24e4a63f3e.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/tron"
+    },
+    {
+        "chain": "BSC",
+        "fullName": "BNB Chain",
+        "shortName": "BNB Chain",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1742545358366.png/type=default_350_0",
+        "order": 6,
+        "isNew": false,
+        "indexPageUrl": "bsc",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/17484c96-a039-4a02-b7c1-e05ca080ff1a.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/bnb-smart-chain"
+    },
+    {
+        "chain": "BASE",
+        "fullName": "Base",
+        "shortName": "Base",
+        "logo": "https://static.oklink.com/cdn/web3/oklinkadmin/picture/base.png",
+        "order": 7,
+        "isNew": false,
+        "indexPageUrl": "base",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.coinall.ltd/cdn/web3/oklinkadmin/picture/a3c38e76-bbd7-4b0b-bdb6-ccf3814ab6cf.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/base"
+    },
+    {
+        "chain": "SUI",
+        "fullName": "Sui",
+        "shortName": "Sui",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1742539825819.png/type=default_350_0",
+        "order": 8,
+        "isNew": false,
+        "indexPageUrl": "sui",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.coinall.ltd/cdn/web3/oklinkadmin/picture/57c31239-6385-4300-976f-de75ac3527a4.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/sui"
+    },
+    {
+        "chain": "APT",
+        "fullName": "Aptos",
+        "shortName": "Aptos",
+        "logo": "https://static.oklink.com/cdn/explorer/oklinkmanage/picture/apt_logo.png",
+        "order": 9,
+        "isNew": false,
+        "indexPageUrl": "aptos",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/cbaf12fe-1999-4d92-81be-1c952b1a60fe.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/aptos"
+    },
+    {
+        "chain": "ARBITRUM",
+        "fullName": "Arbitrum One",
+        "shortName": "Arbitrum One",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686557510911.png",
+        "order": 10,
+        "isNew": false,
+        "indexPageUrl": "arbitrum-one",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/6b0cfa2f-3218-474a-827b-1b07f3d2a619.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/arbitrum-one"
+    },
+    {
+        "chain": "OPTIMISM",
+        "fullName": "OP Mainnet",
+        "shortName": "OP Mainnet",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686557806497.png",
+        "order": 11,
+        "isNew": false,
+        "indexPageUrl": "optimism",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/062fb65e-c9df-4434-bb30-980afa698d92.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/optimism"
+    },
+    {
+        "chain": "POLYGON",
+        "fullName": "Polygon",
+        "shortName": "Polygon",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1697556067799.png/type=png_350_0",
+        "order": 12,
+        "isNew": false,
+        "indexPageUrl": "polygon",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/0122ed97-c3a0-418d-82df-d295ae9aa688.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/polygon"
+    },
+    {
+        "chain": "AVAXC",
+        "fullName": "Avalanche-C",
+        "shortName": "AVAX",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686558223199.png",
+        "order": 13,
+        "isNew": false,
+        "indexPageUrl": "avalanche",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/ef5f851c-5a5d-4e19-a247-0940006b5477.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/avalanche"
+    },
+    {
+        "chain": "POLYGON_ZKEVM",
+        "fullName": "Polygon zkEVM",
+        "shortName": "Polygon zkEVM",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1697556084590.png/type=png_350_0",
+        "order": 14,
+        "isNew": false,
+        "indexPageUrl": "polygon-zkevm",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/1cc64881-cb17-463e-8d9a-2524cbc95324.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/polygon-zkevm"
+    },
+    {
+        "chain": "ZKSYNC",
+        "fullName": "zkSync Era",
+        "shortName": "zkSync Era",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686558413916.png",
+        "order": 15,
+        "isNew": false,
+        "indexPageUrl": "zksync-era",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/d624c4c0-8b46-474f-8824-5cdf99554f53.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/zksync-era"
+    },
+    {
+        "chain": "TON",
+        "fullName": "TON",
+        "shortName": "TON",
+        "logo": "https://static.oklink.com/cdn/explorer/currency/token/ton-ton-null.png",
+        "order": 16,
+        "isNew": false,
+        "indexPageUrl": "ton",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/e41670ca-eaf8-4eb5-9291-5a949d356273.jpeg",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ]
+    },
+    {
+        "chain": "GRAVITY",
+        "fullName": "Gravity Alpha Mainnet",
+        "shortName": "Gravity Alpha",
+        "logo": "https://static.coinall.ltd/cdn/web3/oklinkadmin/picture/logo_gravity.png",
+        "order": 17,
+        "isNew": false,
+        "indexPageUrl": "gravity-alpha",
+        "column": 1,
+        "isHide": false,
+        "belong": "layer2",
+        "type": "standard",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/161e1a6b-6551-4d1b-a261-9fd12f5281eb.png",
+        "supportSites": [
+            "OKLINK",
+            "OKX"
+        ],
+        "walletUrl": "/web3/wallet/gravity-alpha"
+    },
+    {
+        "chain": "BITLAYER",
+        "fullName": "Bitlayer Mainnet",
+        "shortName": "Bitlayer",
+        "logo": "https://okg-pub-hk.oss-cn-hongkong.aliyuncs.com/cdn/assets/imgs/248/D1EF798953119DE0.png",
+        "order": 20,
+        "isNew": false,
+        "indexPageUrl": "bitlayer",
+        "column": 1,
+        "isHide": false,
+        "belong": "layer2",
+        "type": "standard",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/fa55f0c2-7ab7-40d7-9aa3-4955ae493a55.png",
+        "supportSites": [
+            "OKLINK",
+            "OKX"
+        ],
+        "walletUrl": "/web3/wallet/bitlayer"
+    },
+    {
+        "chain": "LINEA",
+        "fullName": "Linea",
+        "shortName": "Linea",
+        "logo": "https://static.oklink.com/cdn/assets/imgs/238/5140289DBEF96554.png",
+        "order": 24,
+        "isNew": false,
+        "indexPageUrl": "linea",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/9e4197da-5a74-43fc-8f69-55040d43447d.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/linea"
+    },
+    {
+        "chain": "BOB",
+        "fullName": "BOB Mainnet",
+        "shortName": "BOB",
+        "logo": "https://static.coinall.ltd/cdn/web3/oklinkadmin/picture/bob_logo.png",
+        "order": 25,
+        "isNew": false,
+        "indexPageUrl": "bob",
+        "column": 1,
+        "isHide": false,
+        "belong": "layer2",
+        "type": "standard",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/65d938ef-3b38-43b7-b9b6-986630489167.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/bob-mainnet"
+    },
+    {
+        "chain": "B2",
+        "fullName": "B² Mainnet",
+        "shortName": "B²",
+        "logo": "https://static.coinall.ltd/cdn/web3/oklinkadmin/picture/B2.png",
+        "order": 26,
+        "isNew": false,
+        "indexPageUrl": "bsquared",
+        "column": 1,
+        "isHide": false,
+        "belong": "layer2",
+        "type": "standard",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/df563d8d-c591-445b-94ee-4e921def3cb6.png",
+        "supportSites": [
+            "OKLINK",
+            "OKX"
+        ],
+        "walletUrl": "/web3/wallet/b2"
+    },
+    {
+        "chain": "DUCKCHAIN",
+        "fullName": "Duckchain Mainnet",
+        "shortName": "Duckchain Mainnet",
+        "logo": "https://static.oklink.com/cdn/assets/imgs/248/2C57745C3A30D61A.png",
+        "order": 27,
+        "isNew": false,
+        "indexPageUrl": "duckchain",
+        "column": 1,
+        "isHide": false,
+        "belong": "layer2",
+        "type": "standard",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/392ed9d3-5c3d-4ed7-a7bb-8b6bddafae51.png",
+        "supportSites": [
+            "OKLINK",
+            "OKX"
+        ]
+    },
+    {
+        "chain": "APE",
+        "fullName": "ApeChain Mainnet",
+        "shortName": "ApeChain Mainnet",
+        "logo": "https://static.oklink.com/cdn/assets/imgs/2410/C0D6A533FAB77246.png",
+        "order": 31,
+        "isNew": false,
+        "indexPageUrl": "apechain",
+        "column": 1,
+        "isHide": false,
+        "belong": "layer2",
+        "type": "standard",
+        "okxSiteChainLogoUrl": "https://static.coinall.ltd/cdn/web3/oklinkadmin/picture/ape.png",
+        "supportSites": [
+            "OKLINK",
+            "OKX"
+        ],
+        "walletUrl": "/web3/wallet/apechain"
+    },
+    {
+        "chain": "MANTAPACIFIC",
+        "fullName": "Manta Pacific",
+        "shortName": "Manta Pacific",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1706091019893.png/type=png_350_0",
+        "order": 32,
+        "isNew": false,
+        "indexPageUrl": "manta",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/6c5081f2-9d9c-4cdf-98bf-83dd3fde721a.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/manta-pacific"
+    },
+    {
+        "chain": "OPBNB",
+        "fullName": "opBNB Mainnet",
+        "shortName": "opBNB",
+        "logo": "https://static.oklink.com/cdn/explorer/oklinkadmin/picture/opbnb_new.png",
+        "order": 33,
+        "isNew": false,
+        "indexPageUrl": "opbnb",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/e7496d65-05e4-4809-a994-14dc46ae00fc.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/opbnb"
+    },
+    {
+        "chain": "SCROLL",
+        "fullName": "Scroll",
+        "shortName": "Scroll",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1697027635993.png/type=png_350_0",
+        "order": 34,
+        "isNew": false,
+        "indexPageUrl": "scroll",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/04d1d5df-8979-46f2-abc3-00b375ddf664.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/scroll"
+    },
+    {
+        "chain": "FTM",
+        "fullName": "Fantom",
+        "shortName": "Fantom",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686558053632.png",
+        "order": 37,
+        "isNew": false,
+        "indexPageUrl": "fantom",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/997b7ea5-865b-49ac-b161-bccabbdbeb8d.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/fantom"
+    },
+    {
+        "chain": "COSMOS",
+        "fullName": "Cosmos Hub",
+        "shortName": "Cosmos",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1687836948833.png",
+        "order": 38,
+        "isNew": false,
+        "indexPageUrl": "cosmos",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/8ef18061-c33c-43a2-8279-f925212a7d1d.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/cosmos-hub"
+    },
+    {
+        "chain": "KAVA",
+        "fullName": "Kava",
+        "shortName": "Kava",
+        "logo": "https://static.oklink.com/cdn/explorer/currency/token/kava-kava-null.png",
+        "order": 39,
+        "isNew": false,
+        "indexPageUrl": "kava",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/8de933f4-0f2e-466a-a2a9-33187e7fa739.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/kava"
+    },
+    {
+        "chain": "KLAYTN",
+        "fullName": "Kaia Network",
+        "shortName": "Kaia",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1724983159147.png/type=png_350_0",
+        "order": 40,
+        "isNew": false,
+        "indexPageUrl": "kaia",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.coinall.ltd/cdn/web3/oklinkadmin/picture/ec796c42-72cb-4bf6-a28c-64aef762ee2b.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/kaia-network"
+    },
+    {
+        "chain": "RONIN",
+        "fullName": "Ronin",
+        "shortName": "RON",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1689678241466.png",
+        "order": 41,
+        "isNew": false,
+        "indexPageUrl": "ronin",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/5f7d7893-dade-4ade-9a00-13cc59932530.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/ronin"
+    },
+    {
+        "chain": "GNOSIS",
+        "fullName": "Gnosis",
+        "shortName": "Gnosis",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1687177220379.png",
+        "order": 42,
+        "isNew": false,
+        "indexPageUrl": "gnosis",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/8c272e08-1522-4b42-bb9a-988701c36404.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/gnosis"
+    },
+    {
+        "chain": "OKEXCHAIN",
+        "fullName": "OKT Chain",
+        "shortName": "OKTC",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686558023497.png",
+        "order": 43,
+        "isNew": false,
+        "indexPageUrl": "oktc",
+        "column": 1,
+        "belong": "hetero",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/d58e5743-db7a-4134-989b-b60fe7843fc3.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/oktc"
+    },
+    {
+        "chain": "ETC",
+        "fullName": "Ethereum Classic",
+        "shortName": "ETC",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1686558153814.png",
+        "order": 44,
+        "isNew": false,
+        "indexPageUrl": "etc",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/0515b2e5-e366-4c05-8265-1c7112700b9c.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/ethereum-classic"
+    },
+    {
+        "chain": "ETHW",
+        "fullName": "EthereumPoW",
+        "shortName": "ETHW",
+        "logo": "https://static.oklink.com/cdn/explorer/icon/default/ETHW.png",
+        "order": 46,
+        "isNew": false,
+        "indexPageUrl": "ethereum-pow",
+        "column": 1,
+        "belong": "evm_layer1",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/190c6690-c341-4e36-b685-4c9fd2e58387.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/ethereumpow"
+    },
+    {
+        "chain": "BEACON",
+        "fullName": "Beacon Chain",
+        "shortName": "Beacon",
+        "logo": "https://static.oklink.com/cdn/explorer/icon/default/Beacon.png",
+        "order": 47,
+        "isNew": false,
+        "indexPageUrl": "beacon",
+        "column": 1,
+        "belong": "layer2",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/ad811e87-fd76-4a45-b4c7-8180894d7a11.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ]
+    },
+    {
+        "chain": "DOGE",
+        "fullName": "Dogecoin",
+        "shortName": "DOGE",
+        "logo": "https://static.oklink.com/cdn/explorer/admin/1696651121774.png/type=png_350_0",
+        "order": 48,
+        "isNew": false,
+        "indexPageUrl": "dogecoin",
+        "column": 1,
+        "belong": "utxo",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/f886a82f-be52-4e14-a83e-b8087f2782e1.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/dogecoin"
+    },
+    {
+        "chain": "LTC",
+        "fullName": "Litecoin",
+        "shortName": "LTC",
+        "logo": "https://static.oklink.com/cdn/explorer/oklinkmanage/picture/ltc_logo.png",
+        "order": 49,
+        "isNew": false,
+        "indexPageUrl": "litecoin",
+        "column": 1,
+        "belong": "utxo",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/f2872b47-1939-47a2-9d02-669bb6359b29.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/litecoin"
+    },
+    {
+        "chain": "BCH",
+        "fullName": "Bitcoin Cash",
+        "shortName": "BCH",
+        "logo": "https://static.oklink.com/cdn/explorer/oklinkmanage/picture/bch_logo.png",
+        "order": 50,
+        "isNew": false,
+        "indexPageUrl": "bch",
+        "column": 1,
+        "belong": "utxo",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/476b7316-c34b-4c13-9e53-e7f57b99db8d.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/bitcoin-cash"
+    },
+    {
+        "chain": "DASH",
+        "fullName": "DASH",
+        "shortName": "DASH",
+        "logo": "https://static.oklink.com/cdn/explorer/oklinkmanage/picture/dash_logo.png",
+        "order": 51,
+        "isNew": false,
+        "indexPageUrl": "dash",
+        "column": 1,
+        "belong": "utxo",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/fb57c216-079c-4177-b6d7-a0f944a403bd.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/dash"
+    },
+    {
+        "chain": "XGON_TEST2",
+        "fullName": "X Layer Testnet",
+        "shortName": "X Layer Testnet",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1711680841142.png/type=png_350_0",
+        "order": 53,
+        "isNew": false,
+        "indexPageUrl": "x-layer-testnet",
+        "column": 1,
+        "belong": "testnet",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/3839f7c1-4c82-481f-ae6a-dd82327bc492.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ]
+    },
+    {
+        "chain": "ETHSEPOLIA",
+        "fullName": "Sepolia Testnet",
+        "shortName": "Sepolia Testnet",
+        "logo": "https://static.oklink.com/cdn/web3/currency/token/1704284866886.png/type=png_350_0",
+        "order": 55,
+        "isNew": false,
+        "indexPageUrl": "sepolia",
+        "column": 1,
+        "belong": "testnet",
+        "okxSiteChainLogoUrl": "https://static.okx.com/cdn/web3/oklinkadmin/picture/4b35f7fe-8d36-44c3-8e39-ad3adedef147.png",
+        "supportSites": [
+            "OKX",
+            "OKLINK"
+        ],
+        "walletUrl": "/web3/wallet/sepolia"
+    }
+]

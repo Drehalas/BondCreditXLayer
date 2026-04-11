@@ -3,8 +3,9 @@
 ## Description
 
 Machine-readable contract for backend automation flows: enroll identity, update profile,
-apply credit with guarantee issuance, repay/settle guarantees, query subscription and pool
-status, fund pool liquidity, rebalance, and retrieve risk/volatility snapshots.
+apply credit with guarantee issuance, repay/settle guarantees, execute Uniswap-style
+trades through a server adapter, index score/unlock events, query subscription/pool state,
+fund pool liquidity, rebalance, and retrieve risk/volatility snapshots.
 
 ## Base URL
 
@@ -29,6 +30,9 @@ Endpoint: GET /.well-known/SKILL.md
 - Some endpoints always use backend signer IDs from env vars (subscription, guarantee, risk, rebalance).
 - For `POST /credit/apply`, `recipient` defaults to `agentId` if omitted.
 - Guarantee IDs and credit IDs are 32-byte hex values (`0x...`, 66 chars total).
+- Trade execution is server-side and tied to the enrolled agent wallet.
+- Score rule is deterministic for hackathon mode: successful trade `+1`, failed trade `-1`.
+- Unlock rules: credit line unlock at score `>= 10`; bonus `$100` unlock at 5 successful trades.
 - Manual onboarding endpoints remain unchanged and are still supported.
 
 ---
@@ -208,6 +212,165 @@ Response (rejected):
 ### Credit Apply (Legacy Alias)
 
 Endpoint: POST /apply
+
+### Uniswap Trade Execute (server adapter)
+
+Endpoint: POST /trade/execute
+
+Request:
+```json
+{
+  "agentId": 12,
+  "pair": "OKB/USDT",
+  "side": "BUY",
+  "amount": 10,
+  "slippageBps": 50,
+  "tokenIn": "0x...",
+  "tokenOut": "0x..."
+}
+```
+
+Response:
+```json
+{
+  "executed": true,
+  "venue": "uniswap-v2",
+  "trade": {
+    "id": 101,
+    "pair": "OKB/USDT",
+    "side": "BUY",
+    "amount": 10,
+    "status": "SUCCESS",
+    "txHash": "0x...",
+    "pnlDelta": 0.012,
+    "errorMessage": null,
+    "executedAt": "ISO-8601"
+  },
+  "score": {
+    "before": 9,
+    "after": 10,
+    "delta": 1,
+    "successfulTrades": 5,
+    "failedTrades": 1
+  },
+  "unlocks": {
+    "creditLineUnlocked": true,
+    "bonusUsd100Unlocked": true,
+    "newlyUnlocked": [
+      "CREDIT_LINE_SCORE_10",
+      "BONUS_USD_100_AFTER_5_WINS"
+    ]
+  }
+}
+```
+
+### Trade Tokens Catalog
+
+Endpoint: GET /trade/tokens
+
+Returns tokens from backend static token-list JSON (`server/data/uniswap-token-list.json`).
+List is filtered by env scope via `BONDCREDIT_TOKEN_LIST_SCOPE` (`mainnet` or `testnet`).
+If the source file contains chain metadata instead of token-contract entries, API returns warnings and a `chainCatalogPreview`.
+
+Response:
+```json
+{
+  "network": "xlayer-testnet",
+  "count": 4,
+  "tokens": [
+    {
+      "symbol": "OKB",
+      "name": "OKB",
+      "address": "0x...",
+      "decimals": 18,
+      "isStable": false,
+      "enabled": true
+    }
+  ],
+  "tradablePairs": [
+    {
+      "pair": "OKB/USDT",
+      "tokenIn": { "symbol": "OKB", "address": "0x...", "decimals": 18 },
+      "tokenOut": { "symbol": "USDT", "address": "0x...", "decimals": 6 }
+    }
+  ]
+}
+```
+
+### Score Status
+
+Endpoint: GET /score/status/:agentId
+
+Response:
+```json
+{
+  "agentId": 12,
+  "walletAddress": "0x...",
+  "score": 10,
+  "successfulTrades": 5,
+  "failedTrades": 1,
+  "unlocks": {
+    "creditLineUnlocked": true,
+    "bonusUsd100Unlocked": true
+  },
+  "updatedAt": "ISO-8601"
+}
+```
+
+### Trade History
+
+Endpoint: GET /trades/history/:agentId?limit=20
+
+Endpoint: GET /trades/history/:agentId
+
+### Unlock Milestones
+
+Endpoint: GET /unlocks/:agentId
+
+### Demo Run: 3 Trades (Replay-safe)
+
+Endpoint: POST /demo/run-3-trades
+
+Request:
+```json
+{
+  "agentId": 12,
+  "idempotencyKey": "demo-2026-04-11-001"
+}
+```
+
+Response:
+```json
+{
+  "demoRun": true,
+  "idempotencyKey": "demo-2026-04-11-001",
+  "idempotentReplay": false,
+  "executedTrades": 3,
+  "evidence": [
+    {
+      "label": "trade-1-success",
+      "tradeId": 201,
+      "pair": "OKB/USDT",
+      "side": "BUY",
+      "amount": 10,
+      "status": "SUCCESS",
+      "txHash": "0x...",
+      "scoreBefore": 0,
+      "scoreAfter": 1,
+      "delta": 1,
+      "newlyUnlocked": []
+    }
+  ],
+  "score": {
+    "creditScore": 1,
+    "successfulTrades": 1,
+    "failedTrades": 0,
+    "creditLineUnlocked": false,
+    "bonusUsd100Unlocked": false
+  },
+  "unlockEvents": []
+}
+```
 
 ### Credit Repay
 
