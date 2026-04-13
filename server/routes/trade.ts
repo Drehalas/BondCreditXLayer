@@ -18,6 +18,37 @@ const ALLOWED_SIDES = new Set<TradeSide>([
 
 const demoRuns = new Map<string, unknown>();
 
+const TX_HASH_REGEX = /^0x[0-9a-fA-F]{64}$/;
+
+function parseTradeStatus(status: string | undefined): TradeExecutionStatus {
+  if (typeof status === 'string' && status.trim().toUpperCase() === TradeExecutionStatus.FAILED) {
+    return TradeExecutionStatus.FAILED;
+  }
+  return TradeExecutionStatus.SUCCESS;
+}
+
+function validateRecordTradeInput(input: {
+  pair?: string;
+  side?: string;
+  amount?: number;
+  txHash?: string;
+}): { pair: string; side: TradeSide; amount: number; txHash: string } | null {
+  if (typeof input.pair !== 'string' || input.pair.trim().length < 3) return null;
+  if (typeof input.side !== 'string') return null;
+
+  const normalizedSide = input.side.trim().toUpperCase() as TradeSide;
+  if (!ALLOWED_SIDES.has(normalizedSide)) return null;
+  if (typeof input.amount !== 'number' || !Number.isFinite(input.amount) || input.amount <= 0) return null;
+  if (typeof input.txHash !== 'string' || !TX_HASH_REGEX.test(input.txHash)) return null;
+
+  return {
+    pair: input.pair,
+    side: normalizedSide,
+    amount: input.amount,
+    txHash: input.txHash,
+  };
+}
+
 function parseAgentId(input: number | string | undefined | null): number | null {
   if (input === undefined || input === null) return null;
   const numeric = typeof input === 'string' ? Number(input) : input;
@@ -25,10 +56,75 @@ function parseAgentId(input: number | string | undefined | null): number | null 
   return numeric;
 }
 
+async function resolveAgentForExecution(input: {
+  db: ReturnType<typeof getDbClient>;
+  agentId?: number | string;
+  walletAddress?: string;
+}): Promise<{
+  agent: { id: number; walletAddress: string; agenticWalletRegistered: boolean } | null;
+  error?: string;
+  status?: number;
+}> {
+  const numericAgentId = parseAgentId(input.agentId);
+  const rawWallet = typeof input.walletAddress === 'string' ? input.walletAddress.trim() : '';
+  const normalizedWalletAddress = rawWallet.length > 0 ? rawWallet.toLowerCase() : null;
+
+  if (numericAgentId === null && normalizedWalletAddress === null) {
+    return { agent: null, error: 'Either agentId or walletAddress is required', status: 400 };
+  }
+
+  if (normalizedWalletAddress !== null && !isAddress(normalizedWalletAddress)) {
+    return { agent: null, error: 'walletAddress must be a valid EVM address', status: 400 };
+  }
+
+  if (numericAgentId !== null && normalizedWalletAddress !== null) {
+    const agent = await input.db.agent.findUnique({
+      where: { id: numericAgentId },
+      select: {
+        id: true,
+        walletAddress: true,
+        agenticWalletRegistered: true,
+      },
+    });
+
+    if (agent?.walletAddress?.toLowerCase() !== normalizedWalletAddress) {
+      return { agent: null, error: 'agentId and walletAddress do not belong to the same agent', status: 400 };
+    }
+    return { agent };
+  }
+
+  if (numericAgentId !== null) {
+    const agent = await input.db.agent.findUnique({
+      where: { id: numericAgentId },
+      select: {
+        id: true,
+        walletAddress: true,
+        agenticWalletRegistered: true,
+      },
+    });
+    return { agent };
+  }
+
+  if (normalizedWalletAddress === null) {
+    return { agent: null, error: 'walletAddress is required when agentId is not provided', status: 400 };
+  }
+
+  const agent = await input.db.agent.findUnique({
+    where: { walletAddress: normalizedWalletAddress },
+    select: {
+      id: true,
+      walletAddress: true,
+      agenticWalletRegistered: true,
+    },
+  });
+  return { agent };
+}
+
 router.get('/trade/tokens', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const network = process.env.BONDCREDIT_NETWORK ?? 'xlayer-testnet';
     const tokenScope = (process.env.BONDCREDIT_TOKEN_LIST_SCOPE ?? 'mainnet').trim().toLowerCase();
+    const executionMode = (process.env.BONDCREDIT_TRADE_EXECUTOR_MODE ?? 'simulated').trim().toLowerCase();
     const tokens = getStaticTradeTokens(tokenScope);
     const chainCatalog = getChainCatalog();
 
@@ -53,6 +149,7 @@ router.get('/trade/tokens', async (_req: Request, res: Response, next: NextFunct
     res.json({
       network,
       tokenScope,
+      executionMode,
       count: tokens.length,
       tokens,
       tradablePairs: pairs,
@@ -72,6 +169,7 @@ router.post('/trade/execute', async (req: Request, res: Response, next: NextFunc
   try {
     const {
       agentId,
+      walletAddress,
       pair,
       side,
       amount,
@@ -80,6 +178,7 @@ router.post('/trade/execute', async (req: Request, res: Response, next: NextFunc
       tokenOut,
     } = req.body as {
       agentId?: number | string;
+      walletAddress?: string;
       pair?: string;
       side?: string;
       amount?: number;
@@ -87,16 +186,6 @@ router.post('/trade/execute', async (req: Request, res: Response, next: NextFunc
       tokenIn?: string;
       tokenOut?: string;
     };
-
-    if (agentId === undefined || agentId === null) {
-      res.status(400).json({ error: 'agentId is required' });
-      return;
-    }
-    const numericAgentId = parseAgentId(agentId);
-    if (numericAgentId === null) {
-      res.status(400).json({ error: 'agentId must be a positive number' });
-      return;
-    }
 
     if (typeof pair !== 'string' || pair.trim().length < 3) {
       res.status(400).json({ error: 'pair is required (example: OKB/USDT)' });
@@ -119,16 +208,15 @@ router.post('/trade/execute', async (req: Request, res: Response, next: NextFunc
     }
 
     const db = getDbClient();
-    const agent = await db.agent.findUnique({
-      where: { id: numericAgentId },
-      select: {
-        id: true,
-        walletAddress: true,
-        agenticWalletRegistered: true,
-      },
-    });
+    const resolved = await resolveAgentForExecution({ db, agentId, walletAddress });
+    if (resolved.error) {
+      res.status(resolved.status ?? 400).json({ error: resolved.error });
+      return;
+    }
+
+    const agent = resolved.agent;
     if (!agent) {
-      res.status(404).json({ error: 'Agent not found' });
+      res.status(404).json({ error: 'Agent not found for provided identity' });
       return;
     }
     if (!isAddress(agent.walletAddress)) {
@@ -213,6 +301,127 @@ router.post('/trade/execute', async (req: Request, res: Response, next: NextFunc
   }
 });
 
+router.post('/trade/record', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      pair,
+      side,
+      amount,
+      txHash,
+      status,
+      pnlDelta,
+      errorMessage,
+      walletAddress,
+      signerAddress,
+      metadata,
+    } = req.body as {
+      pair?: string;
+      side?: string;
+      amount?: number;
+      txHash?: string;
+      status?: string;
+      pnlDelta?: number;
+      errorMessage?: string;
+      walletAddress?: string;
+      signerAddress?: string;
+      metadata?: Record<string, unknown>;
+    };
+
+    const parsed = validateRecordTradeInput({ pair, side, amount, txHash });
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid request payload for trade recording' });
+      return;
+    }
+
+    const normalizedStatus = parseTradeStatus(status);
+
+    const identityWallet = walletAddress ?? signerAddress;
+    if (!identityWallet || !isAddress(identityWallet)) {
+      res.status(400).json({ error: 'walletAddress or signerAddress must be provided and valid' });
+      return;
+    }
+
+    const db = getDbClient();
+    const agent = await db.agent.findUnique({
+      where: { walletAddress: identityWallet.toLowerCase() },
+      select: {
+        id: true,
+        walletAddress: true,
+        agenticWalletRegistered: true,
+      },
+    });
+
+    if (!agent) {
+      res.status(404).json({ error: 'Agent not found; walletAddress must match an enrolled agent' });
+      return;
+    }
+    if (!agent.agenticWalletRegistered) {
+      res.status(400).json({ error: 'Agentic wallet is not registered for this agent. Complete registration first.' });
+      return;
+    }
+
+    const outcome = await db.$transaction(async tx => {
+      const trade = await tx.tradeExecution.create({
+        data: {
+          agentId: agent.id,
+          pair: parsed.pair.trim().toUpperCase(),
+          side: parsed.side,
+          amount: parsed.amount,
+          status: normalizedStatus,
+          txHash: parsed.txHash,
+          pnlDelta: typeof pnlDelta === 'number' ? pnlDelta : null,
+          errorMessage: typeof errorMessage === 'string' ? errorMessage : null,
+          metadata: {
+            executionVenue: 'uniswap-user-signed',
+            ...metadata,
+          },
+        },
+      });
+
+      const score = await applyTradeScoreAndUnlocksTx(tx, {
+        agentId: agent.id,
+        tradeExecutionId: trade.id,
+        status: trade.status,
+        reason:
+          trade.status === TradeExecutionStatus.SUCCESS
+            ? 'User-signed Uniswap trade success'
+            : 'User-signed Uniswap trade failure',
+      });
+
+      return { trade, score };
+    });
+
+    res.json({
+      recorded: true,
+      trade: {
+        id: outcome.trade.id,
+        pair: outcome.trade.pair,
+        side: outcome.trade.side,
+        amount: outcome.trade.amount,
+        status: outcome.trade.status,
+        txHash: outcome.trade.txHash,
+        pnlDelta: outcome.trade.pnlDelta,
+        errorMessage: outcome.trade.errorMessage,
+        executedAt: outcome.trade.executedAt,
+      },
+      score: {
+        before: outcome.score.scoreBefore,
+        after: outcome.score.scoreAfter,
+        delta: outcome.score.delta,
+        successfulTrades: outcome.score.successfulTrades,
+        failedTrades: outcome.score.failedTrades,
+      },
+      unlocks: {
+        creditLineUnlocked: outcome.score.creditLineUnlocked,
+        bonusUsd100Unlocked: outcome.score.bonusUsd100Unlocked,
+        newlyUnlocked: outcome.score.unlocksCreated,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/score/status/:agentId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const numericAgentId = parseAgentId(req.params.agentId);
@@ -237,6 +446,50 @@ router.get('/score/status/:agentId', async (req: Request, res: Response, next: N
     });
     if (!agent) {
       res.status(404).json({ error: 'Agent not found' });
+      return;
+    }
+
+    res.json({
+      agentId: agent.id,
+      walletAddress: agent.walletAddress,
+      score: agent.creditScore,
+      successfulTrades: agent.successfulTrades,
+      failedTrades: agent.failedTrades,
+      unlocks: {
+        creditLineUnlocked: agent.creditLineUnlocked,
+        bonusUsd100Unlocked: agent.bonusUsd100Unlocked,
+      },
+      updatedAt: agent.updatedAt,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/score/status/wallet/:walletAddress', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { walletAddress } = req.params;
+    if (!isAddress(walletAddress)) {
+      res.status(400).json({ error: 'walletAddress must be a valid EVM address' });
+      return;
+    }
+
+    const db = getDbClient();
+    const agent = await db.agent.findUnique({
+      where: { walletAddress: walletAddress.toLowerCase() },
+      select: {
+        id: true,
+        walletAddress: true,
+        creditScore: true,
+        successfulTrades: true,
+        failedTrades: true,
+        creditLineUnlocked: true,
+        bonusUsd100Unlocked: true,
+        updatedAt: true,
+      },
+    });
+    if (!agent) {
+      res.status(404).json({ error: 'Agent not found for the provided wallet address' });
       return;
     }
 
@@ -299,6 +552,57 @@ router.get('/trades/history/:agentId', async (req: Request, res: Response, next:
 
     res.json({
       agentId: numericAgentId,
+      count: trades.length,
+      trades,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/trades/history/wallet/:walletAddress', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { walletAddress } = req.params;
+    if (!isAddress(walletAddress)) {
+      res.status(400).json({ error: 'walletAddress must be a valid EVM address' });
+      return;
+    }
+
+    const limitRaw = req.query.limit;
+    const parsedLimit = typeof limitRaw === 'string' ? Number(limitRaw) : 20;
+    const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(100, Math.trunc(parsedLimit))) : 20;
+
+    const db = getDbClient();
+    const agent = await db.agent.findUnique({
+      where: { walletAddress: walletAddress.toLowerCase() },
+      select: { id: true, walletAddress: true },
+    });
+    if (!agent) {
+      res.status(404).json({ error: 'Agent not found for the provided wallet address' });
+      return;
+    }
+
+    const trades = await db.tradeExecution.findMany({
+      where: { agentId: agent.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        pair: true,
+        side: true,
+        amount: true,
+        status: true,
+        txHash: true,
+        pnlDelta: true,
+        errorMessage: true,
+        executedAt: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({
+      agentId: agent.id,
+      walletAddress: agent.walletAddress,
       count: trades.length,
       trades,
     });

@@ -362,6 +362,7 @@ const CreatePage: React.FC = () => {
       // Capture DB agentId from Step 1 enrollment for use in Step 2 update
       if (typeof enrollResult?.agentId === 'number') {
         setAgentDbId(enrollResult.agentId);
+        globalThis.localStorage.setItem('bondcredit.agentDbId', String(enrollResult.agentId));
       }
       setWalletStatus('Email and wallet saved successfully.');
       next();
@@ -584,11 +585,6 @@ const CreatePage: React.FC = () => {
         </motion.div>
       )}
 
-      {/* {agentDbId !== null && step >= 2 && (
-        <p style={{ marginTop: '12px', color: 'var(--bondcredit-s2)', fontSize: '0.75rem', textAlign: 'center' }}>
-          Agent DB ID: {agentDbId}
-        </p>
-      )} */}
     </main>
   );
 };

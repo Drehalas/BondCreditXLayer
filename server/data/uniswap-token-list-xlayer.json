@@ -1,0 +1,99 @@
+{
+  "name": "X Layer Token List",
+  "version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "tokens": [
+    {
+      "chainId": 1952,
+      "name": "Wrapped OKB",
+      "symbol": "WOKB",
+      "decimals": 18,
+      "address": "0x75d88B4D010D6f85D907d6dE89f8cB7A9b2E8Df1"
+    },
+    {
+      "chainId": 1952,
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "decimals": 6,
+      "address": "0xC6d54D2b624bc59f135717EfC2BF5c0ce4E2519d"
+    },
+    {
+      "chainId": 1952,
+      "name": "Tether",
+      "symbol": "USDT",
+      "decimals": 6,
+      "address": "0xFD086f3D33b2da06BEA74eFB922b22716ED3d63a"
+    },
+    {
+      "chainId": 1952,
+      "name": "Wrapped Ether",
+      "symbol": "WETH",
+      "decimals": 18,
+      "address": "0x5a77f1edC2B3b3B7D00cCf2637eBe6060d6EDCc0"
+    },
+    {
+      "chainId": 1952,
+      "name": "OKB Token",
+      "symbol": "OKB",
+      "decimals": 18,
+      "address": "0x6Fd7D0d3C17D5fa5A38417f3D1E0e1d7d5d5d5d5"
+    },
+    {
+      "chainId": 196,
+      "name": "Wrapped OKB",
+      "symbol": "WOKB",
+      "decimals": 18,
+      "address": "0x0082FA8Fe31De33659f266755dD37d70470d1d92"
+    },
+    {
+      "chainId": 196,
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "decimals": 6,
+      "address": "0xc6d54d2b624bc59f135717efc2bf5c0ce4e2519d"
+    },
+    {
+      "chainId": 196,
+      "name": "Tether",
+      "symbol": "USDT",
+      "decimals": 6,
+      "address": "0xfd086f3d33b2da06bea74efb922b22716ed3d63a"
+    },
+    {
+      "chainId": 196,
+      "name": "Wrapped Ether",
+      "symbol": "WETH",
+      "decimals": 18,
+      "address": "0x5a77f1edC2B3b3B7D00cCf2637eBe6060d6EDCc0"
+    }
+  ],
+  "chainCatalog": [
+    {
+      "chain": "BTC",
+      "fullName": "Bitcoin",
+      "shortName": "BTC",
+      "belong": "utxo"
+    },
+    {
+      "chain": "ETH",
+      "fullName": "Ethereum",
+      "shortName": "ETH",
+      "belong": "evm_layer1"
+    },
+    {
+      "chain": "XLAYER",
+      "fullName": "X Layer",
+      "shortName": "XL",
+      "belong": "evm_layer2"
+    },
+    {
+      "chain": "OKB",
+      "fullName": "OKB Chain",
+      "shortName": "OKB",
+      "belong": "evm_layer1"
+    }
+  ]
+}

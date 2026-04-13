@@ -49,6 +49,35 @@ function resolveTargetChainId(scope: string): number {
   return Number(process.env.BONDCREDIT_TOKEN_LIST_MAINNET_CHAIN_ID ?? 1);
 }
 
+function isValidToken(token: UniswapTokenListToken, targetChainId: number): boolean {
+  const chainId = Number(token.chainId ?? -1);
+  const address = typeof token.address === 'string' ? token.address.trim() : '';
+  const symbol = typeof token.symbol === 'string' ? token.symbol.trim().toUpperCase() : '';
+  const name = typeof token.name === 'string' ? token.name.trim() : '';
+  const decimals = Number(token.decimals ?? 18);
+
+  if (chainId !== targetChainId) return false;
+  if (!isAddress(address)) return false;
+  if (!symbol || !name) return false;
+  if (!Number.isFinite(decimals) || decimals < 0 || decimals > 36) return false;
+  return true;
+}
+
+function tokenToTradeToken(token: UniswapTokenListToken): TradeToken {
+  const symbol = typeof token.symbol === 'string' ? token.symbol.trim().toUpperCase() : '';
+  const name = typeof token.name === 'string' ? token.name.trim() : '';
+  const address = typeof token.address === 'string' ? token.address.trim() : '';
+
+  return {
+    symbol,
+    name,
+    address,
+    decimals: Number(token.decimals ?? 18),
+    isStable: STABLE_SYMBOLS.has(symbol),
+    enabled: true,
+  };
+}
+
 export function getStaticTradeTokens(scope: string): TradeToken[] {
   const key = scope.trim().toLowerCase();
   const cached = cachedByScope.get(key);
@@ -56,37 +85,29 @@ export function getStaticTradeTokens(scope: string): TradeToken[] {
 
   const raw = readFileSync(tokenListPath, 'utf8');
   const parsed = JSON.parse(raw) as UniswapTokenList | ChainCatalog;
-  if (Array.isArray(parsed)) {
+
+  let list: UniswapTokenListToken[] = [];
+
+  // Check if this is a hybrid format with both tokens and chainCatalog
+  if (typeof parsed === 'object' && !Array.isArray(parsed) && 'tokens' in parsed) {
+    list = Array.isArray(parsed.tokens) ? parsed.tokens : [];
+  } else if (Array.isArray(parsed)) {
+    // Old format - chain catalog only, no tokens
     cachedByScope.set(key, []);
     return [];
   }
-  const list = Array.isArray(parsed.tokens) ? parsed.tokens : [];
 
   const dedup = new Map<string, TradeToken>();
   const targetChainId = resolveTargetChainId(scope);
+
   for (const token of list) {
-    const chainId = Number(token.chainId ?? -1);
-    const address = String(token.address ?? '').trim();
-    const symbol = String(token.symbol ?? '').trim().toUpperCase();
-    const name = String(token.name ?? '').trim();
-    const decimals = Number(token.decimals ?? 18);
+    if (!isValidToken(token, targetChainId)) continue;
 
-    if (chainId !== targetChainId) continue;
-    if (!isAddress(address)) continue;
-    if (!symbol || !name) continue;
-    if (!Number.isFinite(decimals) || decimals < 0 || decimals > 36) continue;
+    const tradeToken = tokenToTradeToken(token);
+    const dedupeKey = `${tradeToken.symbol}:${tradeToken.address.toLowerCase()}`;
+    if (dedup.has(dedupeKey)) continue;
 
-    const key = `${symbol}:${address.toLowerCase()}`;
-    if (dedup.has(key)) continue;
-
-    dedup.set(key, {
-      symbol,
-      name,
-      address,
-      decimals,
-      isStable: STABLE_SYMBOLS.has(symbol),
-      enabled: true,
-    });
+    dedup.set(dedupeKey, tradeToken);
   }
 
   const tokens = [...dedup.values()];
@@ -99,20 +120,36 @@ export function getChainCatalog(): ChainCatalogItem[] {
 
   const raw = readFileSync(tokenListPath, 'utf8');
   const parsed = JSON.parse(raw) as UniswapTokenList | ChainCatalog;
-  if (!Array.isArray(parsed)) {
+
+  if (Array.isArray(parsed)) {
+    // Old format - direct array of chain items
+    cachedChainCatalog = parsed
+      .map(item => toChainCatalogItem(item))
+      .filter(item => item.chain.length > 0 && item.fullName.length > 0);
+  } else if (typeof parsed === 'object' && 'chainCatalog' in parsed && Array.isArray(parsed.chainCatalog)) {
+    // New hybrid format - chainCatalog is nested
+    cachedChainCatalog = parsed.chainCatalog
+      .map((item: Record<string, unknown>) => toChainCatalogItem(item))
+      .filter(item => item.chain.length > 0 && item.fullName.length > 0);
+  } else {
     cachedChainCatalog = [];
-    return cachedChainCatalog;
   }
 
-  cachedChainCatalog = parsed
-    .map(item => ({
-      chain: String(item.chain ?? '').trim(),
-      fullName: String(item.fullName ?? '').trim(),
-      shortName: String(item.shortName ?? '').trim(),
-      belong: typeof item.belong === 'string' ? item.belong : undefined,
-      walletUrl: typeof item.walletUrl === 'string' ? item.walletUrl : undefined,
-    }))
-    .filter(item => item.chain.length > 0 && item.fullName.length > 0);
-
   return cachedChainCatalog;
+}
+
+function toChainCatalogItem(item: Record<string, unknown>): ChainCatalogItem {
+  const chain = typeof item.chain === 'string' ? item.chain.trim() : '';
+  const fullName = typeof item.fullName === 'string' ? item.fullName.trim() : '';
+  const shortName = typeof item.shortName === 'string' ? item.shortName.trim() : '';
+  const belong = typeof item.belong === 'string' ? item.belong : undefined;
+  const walletUrl = typeof item.walletUrl === 'string' ? item.walletUrl : undefined;
+
+  return {
+    chain,
+    fullName,
+    shortName,
+    belong,
+    walletUrl,
+  };
 }

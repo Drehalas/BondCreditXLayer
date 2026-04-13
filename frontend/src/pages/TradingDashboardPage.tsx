@@ -1,12 +1,68 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Zap, BarChart3, Repeat, Shield, ArrowDownLeft, ArrowUpRight, Star } from 'lucide-react';
+import { BrowserProvider, Contract, isAddress, parseUnits } from 'ethers';
+import { useBondCredit } from '../context/BondCreditContext';
 
 /* ═══════════════════════════════════════════════════════════════
    MOCK DATA — will be replaced with live API data later
    ═══════════════════════════════════════════════════════════════ */
 
-const CREDIT_SCORE = 712;
+const API_BASE_URL = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
+const ROUTER_ADDRESS =
+  import.meta.env.VITE_BONDCREDIT_UNISWAP_V2_ROUTER ??
+  '0x199c0ec9736e651582236a282f1647fdf320078b';
+const EXPECTED_CHAIN_ID = BigInt(import.meta.env.VITE_BONDCREDIT_CHAIN_ID ?? '1952');
+
+interface Eip1193Provider {
+  request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
+  on?(event: string, listener: (...args: unknown[]) => void): void;
+  removeListener?(event: string, listener: (...args: unknown[]) => void): void;
+}
+
+const UNISWAP_V2_ROUTER_ABI = [
+  'function getAmountsOut(uint amountIn, address[] memory path) view returns (uint[] memory amounts)',
+  'function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory amounts)',
+] as const;
+
+const ERC20_ABI = [
+  'function decimals() view returns (uint8)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+] as const;
+
+type TradeTab = 'buy' | 'sell' | 'long' | 'short' | 'deposit';
+
+interface TradeToken {
+  symbol: string;
+  address: string;
+  decimals: number;
+}
+
+interface TradablePair {
+  pair: string;
+  tokenIn: TradeToken;
+  tokenOut: TradeToken;
+}
+
+interface TradeHistoryItem {
+  id: number;
+  pair: string;
+  side: string;
+  amount: number;
+  status: string;
+  txHash?: string | null;
+  pnlDelta?: number | null;
+  errorMessage?: string | null;
+  executedAt: string;
+}
+
+interface ScoreStatus {
+  score: number;
+  successfulTrades: number;
+  failedTrades: number;
+  updatedAt?: string;
+}
 
 const WALLET_TOKENS = [
   { symbol: 'ETH', name: 'Ethereum', amount: '2.847', usd: '$5,694.00', change: '+3.2%', positive: true, sparkline: [40,42,38,45,43,48,52,50,55,53,58] },
@@ -29,14 +85,6 @@ const MARKETS = [
   { name: 'Aave V3', pairs: '45+', volume: '$340M', status: 'Active' },
 ];
 
-const TRADE_HISTORY = [
-  { pair: 'ETH/USDC', side: 'Buy', type: 'Market', amount: '0.5 ETH', price: '$2,012.40', time: '2 min ago', status: 'Filled', pnl: '+$24.50' },
-  { pair: 'OKB/USDT', side: 'Long', type: 'Limit', amount: '120 OKB', price: '$50.12', time: '18 min ago', status: 'Filled', pnl: '+$86.40' },
-  { pair: 'USDC/USDT', side: 'Sell', type: 'Swap', amount: '1,200 USDC', price: '$1.0001', time: '45 min ago', status: 'Filled', pnl: '+$0.12' },
-  { pair: 'ETH/USDC', side: 'Short', type: 'Limit', amount: '0.3 ETH', price: '$2,045.80', time: '2 hrs ago', status: 'Filled', pnl: '-$12.30' },
-  { pair: 'OKB/USDT', side: 'Buy', type: 'Market', amount: '65 OKB', price: '$49.88', time: '5 hrs ago', status: 'Filled', pnl: '+$33.15' },
-];
-
 const TX_HISTORY = [
   { type: 'receive', label: 'Funds received', asset: '0.0124 BTC', time: '2 min ago' },
   { type: 'send', label: 'Withdraw funds', asset: '-$300.00', time: '18 min ago' },
@@ -46,7 +94,51 @@ const TX_HISTORY = [
   { type: 'credit', label: 'Credit Score +3', asset: '+3 pts', time: '5 hrs ago' },
 ];
 
-const PAIRS = ['ETH/USDC', 'OKB/USDT', 'USDC/USDT', 'ETH/OKB', 'BTC/USDC'];
+function toTradeSide(tab: TradeTab): 'BUY' | 'SELL' | 'LONG' | 'SHORT' | 'DEPOSIT' {
+  if (tab === 'sell') return 'SELL';
+  if (tab === 'long') return 'LONG';
+  if (tab === 'short') return 'SHORT';
+  if (tab === 'deposit') return 'DEPOSIT';
+  return 'BUY';
+}
+
+function formatRelativeTime(iso: string): string {
+  const deltaSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
+  if (deltaSeconds < 60) return `${deltaSeconds}s ago`;
+  if (deltaSeconds < 3600) return `${Math.floor(deltaSeconds / 60)} min ago`;
+  if (deltaSeconds < 86400) return `${Math.floor(deltaSeconds / 3600)} hrs ago`;
+  return `${Math.floor(deltaSeconds / 86400)}d ago`;
+}
+
+function sideLabel(side: string): 'Buy' | 'Sell' | 'Long' | 'Short' | 'Deposit' {
+  const normalized = side.trim().toUpperCase();
+  if (normalized === 'SELL') return 'Sell';
+  if (normalized === 'LONG') return 'Long';
+  if (normalized === 'SHORT') return 'Short';
+  if (normalized === 'DEPOSIT') return 'Deposit';
+  return 'Buy';
+}
+
+function sanitizeGradientId(input: string): string {
+  return input
+    .replaceAll('-', '')
+    .replaceAll('#', '')
+    .replaceAll('(', '')
+    .replaceAll(')', '')
+    .replaceAll(',', '')
+    .replaceAll(' ', '');
+}
+
+async function ensureWalletOnExpectedChain(provider: BrowserProvider, injected: Eip1193Provider): Promise<void> {
+  const current = await provider.getNetwork();
+  if (current.chainId === EXPECTED_CHAIN_ID) return;
+
+  const expectedHex = `0x${EXPECTED_CHAIN_ID.toString(16)}`;
+  await injected.request({
+    method: 'wallet_switchEthereumChain',
+    params: [{ chainId: expectedHex }],
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Mini SVG Sparkline
@@ -54,6 +146,7 @@ const PAIRS = ['ETH/USDC', 'OKB/USDT', 'USDC/USDT', 'ETH/OKB', 'BTC/USDC'];
 const Sparkline: React.FC<{ data: number[]; color: string; width?: number; height?: number }> = ({
   data, color, width = 80, height = 32
 }) => {
+  const gradientId = `spark-${sanitizeGradientId(color)}`;
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
@@ -68,12 +161,12 @@ const Sparkline: React.FC<{ data: number[]; color: string; width?: number; heigh
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
       <defs>
-        <linearGradient id={`spark-${color.replace(/[^a-z0-9]/gi, '')}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.3" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <polygon points={areaPoints} fill={`url(#spark-${color.replace(/[^a-z0-9]/gi, '')})`} />
+      <polygon points={areaPoints} fill={`url(#${gradientId})`} />
       <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -178,18 +271,354 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
    Main Dashboard Component
    ═══════════════════════════════════════════════════════════════ */
 const TradingDashboardPage: React.FC = () => {
-  const [tradeTab, setTradeTab] = useState<'buy' | 'sell' | 'long' | 'short' | 'deposit'>('buy');
+  const { appendLog } = useBondCredit();
+  const [tradeTab, setTradeTab] = useState<TradeTab>('buy');
   const [selectedPair, setSelectedPair] = useState('ETH/USDC');
   const [tradeAmount, setTradeAmount] = useState('');
   const [chartPeriod, setChartPeriod] = useState<'1W' | '1M' | '3M' | '1Y'>('1M');
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [networkLabel, setNetworkLabel] = useState('XLayer Testnet');
+  const [tradablePairs, setTradablePairs] = useState<TradablePair[]>([]);
+  const [executionMode, setExecutionMode] = useState<'simulated' | 'uniswap-v2'>('simulated');
+  const [loadingPairs, setLoadingPairs] = useState(false);
+  const [tradeError, setTradeError] = useState('');
+  const [tradeStatus, setTradeStatus] = useState('');
+  const [isExecutingTrade, setIsExecutingTrade] = useState(false);
+  const [isSnapshotLoading, setIsSnapshotLoading] = useState(false);
+  const [liveTradeHistory, setLiveTradeHistory] = useState<TradeHistoryItem[]>([]);
+  const [liveScore, setLiveScore] = useState<ScoreStatus | null>(null);
 
-  const totalUsd = WALLET_TOKENS.reduce((sum, t) => sum + parseFloat(t.usd.replace(/[$,]/g, '')), 0);
+  const totalUsd = WALLET_TOKENS.reduce((sum, t) => sum + Number.parseFloat(t.usd.replaceAll('$', '').replaceAll(',', '')), 0);
 
   const sideColors: Record<string, string> = {
     Buy: '#3bf7d2',
     Sell: '#ff4d6d',
     Long: '#bced62',
     Short: '#ff8c42',
+    Deposit: '#7aa7ff',
+  };
+
+  const pairOptions = useMemo(
+    () => tradablePairs.map(item => item.pair),
+    [tradablePairs],
+  );
+
+  const displayedScore = liveScore?.score ?? 0;
+
+  const displayedTrades = useMemo(() => {
+    return liveTradeHistory.map(item => {
+      const label = sideLabel(item.side);
+      let pnl: string;
+      if (item.pnlDelta == null) {
+        pnl = item.status === 'SUCCESS' ? '+$0.00' : '-$0.00';
+      } else {
+        const sign = item.pnlDelta >= 0 ? '+' : '-';
+        pnl = `${sign}$${Math.abs(item.pnlDelta).toFixed(4)}`;
+      }
+
+      return {
+        pair: item.pair,
+        side: label,
+        type: 'Swap',
+        amount: `${item.amount}`,
+        price: item.txHash ? `${item.txHash.slice(0, 10)}...` : 'N/A',
+        time: formatRelativeTime(item.executedAt),
+        status: item.status === 'SUCCESS' ? 'Filled' : 'Failed',
+        pnl,
+      };
+    });
+  }, [liveTradeHistory]);
+
+  const loadTradeTokens = async () => {
+    setLoadingPairs(true);
+    setTradeError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/trade/tokens`);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(typeof payload?.error === 'string' ? payload.error : `Failed to load pairs (${response.status})`);
+      }
+
+      const pairs = Array.isArray(payload?.tradablePairs) ? payload.tradablePairs as TradablePair[] : [];
+      setTradablePairs(pairs);
+      if (payload?.executionMode === 'uniswap-v2') {
+        setExecutionMode('uniswap-v2');
+      } else {
+        setExecutionMode('simulated');
+      }
+      if (typeof payload?.network === 'string') {
+        setNetworkLabel(payload.network === 'xlayer-mainnet' ? 'XLayer Mainnet' : 'XLayer Testnet');
+      }
+      if (pairs.length > 0) {
+        setSelectedPair(pairs[0]?.pair ?? 'ETH/USDC');
+      }
+
+      appendLog(`trade.tokens(): loaded ${pairs.length} pairs`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load token pairs';
+      setTradeError(message);
+      appendLog(`trade.tokens.error(): ${message}`);
+    } finally {
+      setLoadingPairs(false);
+    }
+  };
+
+  const loadWalletTradeSnapshot = async (walletAddress: string) => {
+    setIsSnapshotLoading(true);
+    try {
+      const [historyResponse, scoreResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/trades/history/wallet/${walletAddress}?limit=20`),
+        fetch(`${API_BASE_URL}/score/status/wallet/${walletAddress}`),
+      ]);
+
+      if (historyResponse.ok) {
+        const historyPayload = await historyResponse.json().catch(() => null);
+        if (Array.isArray(historyPayload?.trades)) {
+          setLiveTradeHistory(historyPayload.trades as TradeHistoryItem[]);
+        }
+      }
+
+      if (scoreResponse.ok) {
+        const scorePayload = await scoreResponse.json().catch(() => null);
+        if (typeof scorePayload?.score === 'number') {
+          setLiveScore({
+            score: scorePayload.score,
+            successfulTrades: Number(scorePayload.successfulTrades ?? 0),
+            failedTrades: Number(scorePayload.failedTrades ?? 0),
+            updatedAt: typeof scorePayload.updatedAt === 'string' ? scorePayload.updatedAt : undefined,
+          });
+        }
+      }
+    } catch {
+      // Keep the dashboard resilient; users can still execute a trade.
+    } finally {
+      setIsSnapshotLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadTradeTokens();
+  }, []);
+
+  useEffect(() => {
+    const injected = (globalThis as typeof globalThis & { ethereum?: Eip1193Provider }).ethereum;
+    if (!injected) return;
+
+    const syncWallet = async () => {
+      try {
+        const accounts = await injected.request({ method: 'eth_accounts' });
+        const primary = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
+        if (primary && isAddress(primary)) {
+          setConnectedWallet(primary);
+          return;
+        }
+      } catch {
+        // Ignore provider read errors and keep dashboard usable.
+      }
+
+      setConnectedWallet(null);
+      setLiveTradeHistory([]);
+      setLiveScore(null);
+    };
+
+    const onAccountsChanged = (accounts: unknown) => {
+      const primary = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
+      if (primary && isAddress(primary)) {
+        setConnectedWallet(primary);
+        return;
+      }
+      setConnectedWallet(null);
+      setLiveTradeHistory([]);
+      setLiveScore(null);
+    };
+
+    void syncWallet();
+    injected.on?.('accountsChanged', onAccountsChanged);
+    return () => {
+      injected.removeListener?.('accountsChanged', onAccountsChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!connectedWallet || !isAddress(connectedWallet)) {
+      setLiveTradeHistory([]);
+      setLiveScore(null);
+      return;
+    }
+
+    void loadWalletTradeSnapshot(connectedWallet);
+  }, [connectedWallet]);
+
+  const executeSimulatedTrade = async (input: {
+    signerAddress: string;
+    amount: number;
+    selectedPairMeta: TradablePair;
+  }) => {
+    setTradeStatus('Submitting simulated trade...');
+    const executeResponse = await fetch(`${API_BASE_URL}/trade/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: input.signerAddress,
+        pair: selectedPair,
+        side: toTradeSide(tradeTab),
+        amount: input.amount,
+        tokenIn: input.selectedPairMeta.tokenIn.address,
+        tokenOut: input.selectedPairMeta.tokenOut.address,
+      }),
+    });
+
+    const executePayload = await executeResponse.json().catch(() => null);
+    if (!executeResponse.ok) {
+      throw new Error(
+        typeof executePayload?.error === 'string'
+          ? executePayload.error
+          : `Could not execute simulated trade (${executeResponse.status})`,
+      );
+    }
+
+    setTradeStatus(`Simulated trade recorded. Status: ${executePayload?.trade?.status ?? 'SUCCESS'}`);
+    appendLog(`trade.simulated.execute(): ${JSON.stringify(executePayload, null, 2)}`);
+    await loadWalletTradeSnapshot(input.signerAddress);
+    setTradeAmount('');
+  };
+
+  const executeUserSignedTrade = async (input: {
+    signer: Awaited<ReturnType<BrowserProvider['getSigner']>>;
+    signerAddress: string;
+    amount: number;
+    selectedPairMeta: TradablePair;
+  }) => {
+    const tokenInContract = new Contract(input.selectedPairMeta.tokenIn.address, ERC20_ABI, input.signer);
+    const router = new Contract(ROUTER_ADDRESS, UNISWAP_V2_ROUTER_ABI, input.signer);
+
+    const tokenDecimals = Number(await tokenInContract.decimals());
+    const amountIn = parseUnits(String(input.amount), tokenDecimals);
+    const path = [input.selectedPairMeta.tokenIn.address, input.selectedPairMeta.tokenOut.address];
+
+    setTradeStatus('Fetching swap quote...');
+    const quoted = (await router.getAmountsOut(amountIn, path)) as bigint[];
+    const estimatedAmountOut = quoted.at(-1) ?? 0n;
+    const amountOutMin = (estimatedAmountOut * 9950n) / 10000n;
+
+    setTradeStatus('Checking token allowance...');
+    const allowance = (await tokenInContract.allowance(input.signerAddress, ROUTER_ADDRESS)) as bigint;
+    if (allowance < amountIn) {
+      const approveTx = await tokenInContract.approve(ROUTER_ADDRESS, amountIn);
+      setTradeStatus('Waiting for token approval confirmation...');
+      await approveTx.wait();
+    }
+
+    const deadline = Math.floor(Date.now() / 1000) + 10 * 60;
+    setTradeStatus('Awaiting wallet signature for swap...');
+    const swapTx = await router.swapExactTokensForTokens(
+      amountIn,
+      amountOutMin,
+      path,
+      input.signerAddress,
+      deadline,
+    );
+
+    setTradeStatus('Swap transaction pending...');
+    const receipt = await swapTx.wait();
+    const txStatus = receipt?.status === 1 ? 'SUCCESS' : 'FAILED';
+    const txHash = receipt?.hash ?? swapTx.hash;
+
+    const recordResponse = await fetch(`${API_BASE_URL}/trade/record`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: input.signerAddress,
+        pair: selectedPair,
+        side: toTradeSide(tradeTab),
+        amount: input.amount,
+        txHash,
+        status: txStatus,
+        metadata: {
+          tokenIn: input.selectedPairMeta.tokenIn.address,
+          tokenOut: input.selectedPairMeta.tokenOut.address,
+          amountInWei: amountIn.toString(),
+          amountOutMinWei: amountOutMin.toString(),
+          estimatedAmountOutWei: estimatedAmountOut.toString(),
+          manualUserSigned: true,
+        },
+      }),
+    });
+
+    const recordPayload = await recordResponse.json().catch(() => null);
+    if (!recordResponse.ok) {
+      throw new Error(
+        typeof recordPayload?.error === 'string'
+          ? recordPayload.error
+          : `Could not record signed trade (${recordResponse.status})`,
+      );
+    }
+
+    setTradeStatus(`User-signed trade recorded. Tx: ${txHash}`);
+    appendLog(`trade.userSigned.record(): ${JSON.stringify(recordPayload, null, 2)}`);
+    await loadWalletTradeSnapshot(input.signerAddress);
+    setTradeAmount('');
+  };
+
+  const handleExecuteTrade = async () => {
+    setTradeError('');
+    setTradeStatus('');
+
+    const amount = Number(tradeAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setTradeError('Enter a valid positive trade amount.');
+      return;
+    }
+
+    const selectedPairMeta = tradablePairs.find(item => item.pair === selectedPair);
+    if (!selectedPairMeta) {
+      setTradeError('Selected pair is unavailable in current token catalog.');
+      return;
+    }
+    if (!isAddress(selectedPairMeta.tokenIn.address) || !isAddress(selectedPairMeta.tokenOut.address)) {
+      setTradeError('Token address metadata is invalid for selected pair.');
+      return;
+    }
+    if (!isAddress(ROUTER_ADDRESS)) {
+      setTradeError('VITE_BONDCREDIT_UNISWAP_V2_ROUTER is missing or invalid.');
+      return;
+    }
+
+    setIsExecutingTrade(true);
+    try {
+      const injected = (globalThis as typeof globalThis & { ethereum?: Eip1193Provider }).ethereum;
+      if (!injected) {
+        throw new Error('No injected wallet found. Install MetaMask or another EVM wallet extension.');
+      }
+
+      setTradeStatus('Connecting wallet...');
+      await injected.request({ method: 'eth_requestAccounts' });
+      const provider = new BrowserProvider(injected);
+      await ensureWalletOnExpectedChain(provider, injected);
+
+      const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+
+      setConnectedWallet(signerAddress);
+
+      if (executionMode === 'simulated') {
+        await executeSimulatedTrade({ signerAddress, amount, selectedPairMeta });
+        return;
+      }
+
+      await executeUserSignedTrade({
+        signer,
+        signerAddress,
+        amount,
+        selectedPairMeta,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Trade execution failed';
+      setTradeError(message);
+      appendLog(`trade.execute.error(): ${message}`);
+    } finally {
+      setIsExecutingTrade(false);
+    }
   };
 
   return (
@@ -203,7 +632,7 @@ const TradingDashboardPage: React.FC = () => {
         <div className="dash-topbar__right">
           <div className="dash-topbar__status">
             <div className="dash-topbar__dot" />
-            XLayer Testnet
+            {networkLabel}
           </div>
         </div>
       </div>
@@ -288,14 +717,29 @@ const TradingDashboardPage: React.FC = () => {
                 <h3 className="dash-card__title">Credit Score</h3>
                 <div className="dash-credit__badge">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3bf7d2" strokeWidth="3"><polyline points="18 15 12 9 6 15" /></svg>
-                  +12 pts
+                  {liveScore ? 'Live score' : 'Waiting for wallet'}
                 </div>
               </div>
-              <ScoreGauge score={CREDIT_SCORE} />
+              {executionMode === 'simulated' && (
+                <div className="dash-trade__hint" style={{ marginBottom: '10px', color: '#ffb066' }}>
+                  Simulator mode active: trades update history and score without on-chain spend.
+                </div>
+              )}
+              {connectedWallet && isSnapshotLoading && (
+                <div className="dash-trade__hint" style={{ marginBottom: '10px' }}>
+                  Loading credit score from trade history...
+                </div>
+              )}
+              <ScoreGauge score={displayedScore} />
+              <div className="dash-trade__hint" style={{ marginBottom: '10px' }}>
+                {liveScore
+                  ? `Generated from trades: ${liveScore.successfulTrades} successful, ${liveScore.failedTrades} failed`
+                  : 'Connect wallet to load trade-derived credit score.'}
+              </div>
               <div className="dash-credit__factors">
                 {[
-                  { label: 'Trade Consistency', val: 85 },
-                  { label: 'Settlement History', val: 92 },
+                  { label: 'Trade Consistency', val: liveScore ? Math.min(100, 50 + (liveScore.successfulTrades * 5)) : 85 },
+                  { label: 'Settlement History', val: liveScore ? Math.min(100, 50 + (liveScore.successfulTrades * 6)) : 92 },
                   { label: 'Risk Management', val: 68 },
                   { label: 'Portfolio Diversity', val: 74 },
                 ].map(f => (
@@ -369,8 +813,9 @@ const TradingDashboardPage: React.FC = () => {
               <div className="dash-trade__form">
                 <label className="dash-trade__label">
                   <span>Pair</span>
-                  <select value={selectedPair} onChange={e => setSelectedPair(e.target.value)} className="dash-trade__select">
-                    {PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
+                  <select value={selectedPair} onChange={e => setSelectedPair(e.target.value)} className="dash-trade__select" disabled={loadingPairs}>
+                    {pairOptions.length === 0 && <option value="">No tradable pairs available</option>}
+                    {pairOptions.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </label>
 
@@ -398,17 +843,34 @@ const TradingDashboardPage: React.FC = () => {
                 )}
 
                 {tradeTab === 'deposit' ? (
-                  <button className="dash-trade__exec dash-trade__exec--green">
+                  <button
+                    className="dash-trade__exec dash-trade__exec--green"
+                    onClick={handleExecuteTrade}
+                    disabled={isExecutingTrade || loadingPairs}
+                  >
                     Deposit {tradeAmount || ''} {tradeAmount ? selectedPair.split('/')[0] : ''}
                   </button>
                 ) : (
-                  <button className={`dash-trade__exec ${tradeTab === 'buy' || tradeTab === 'long' ? 'dash-trade__exec--green' : 'dash-trade__exec--red'}`}>
+                  <button
+                    className={`dash-trade__exec ${tradeTab === 'buy' || tradeTab === 'long' ? 'dash-trade__exec--green' : 'dash-trade__exec--red'}`}
+                    onClick={handleExecuteTrade}
+                    disabled={isExecutingTrade || loadingPairs}
+                  >
                     {tradeTab === 'buy' && `Buy ${selectedPair.split('/')[0]}`}
                     {tradeTab === 'sell' && `Sell ${selectedPair.split('/')[0]}`}
                     {tradeTab === 'long' && `Long ${selectedPair.split('/')[0]}`}
                     {tradeTab === 'short' && `Short ${selectedPair.split('/')[0]}`}
                   </button>
                 )}
+
+                {loadingPairs && <div className="dash-trade__hint">Loading tradable pairs...</div>}
+                {!loadingPairs && pairOptions.length === 0 && (
+                  <div className="dash-trade__hint" style={{ color: '#ffb066' }}>
+                    No tradable pairs were loaded from backend token catalog. Check BONDCREDIT_TOKEN_LIST_SCOPE and chain IDs.
+                  </div>
+                )}
+                {tradeStatus && <div className="dash-trade__hint" style={{ color: '#3bf7d2' }}>{tradeStatus}</div>}
+                {tradeError && <div className="dash-trade__hint" style={{ color: '#ff4d6d' }}>{tradeError}</div>}
 
                 <div className="dash-trade__hint">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3bf7d2" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
@@ -427,17 +889,21 @@ const TradingDashboardPage: React.FC = () => {
           >
             <div className="dash-orders__header">
               <div className="dash-orders__tabs">
-                <button className="dash-orders__tab active">Active Orders</button>
-                <button className="dash-orders__tab">Filled Orders</button>
-                <button className="dash-orders__tab">My Trades</button>
+                <button className="dash-orders__tab active">My Trades</button>
               </div>
-              <span className="dash-orders__count">{TRADE_HISTORY.length} trades</span>
+              <span className="dash-orders__count">{displayedTrades.length} trades</span>
             </div>
             <div className="dash-orders__table">
               <div className="dash-orders__thead">
                 <span>Pair</span><span>Side</span><span>Type</span><span>Amount</span><span>Price</span><span>Time</span><span>Status</span><span>P&L</span>
               </div>
-              {TRADE_HISTORY.map((t, i) => (
+              {displayedTrades.length === 0 && (
+                <div className="dash-orders__row">
+                  <span className="dash-orders__pair">No trades yet</span>
+                  <span>-</span><span>-</span><span>-</span><span>-</span><span>-</span><span>-</span><span>-</span>
+                </div>
+              )}
+              {displayedTrades.map((t, i) => (
                 <motion.div
                   key={`${t.pair}-${t.time}-${i}`}
                   className="dash-orders__row"
