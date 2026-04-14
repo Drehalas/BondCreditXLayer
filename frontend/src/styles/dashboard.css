@@ -864,3 +864,333 @@
 .dash-wallet-mini__btn--primary:hover {
   background: rgba(59,247,210,0.18);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Trade Page — Agent Terminal, Execution, Scoring, Rewards
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Terminal ── */
+.trade-terminal__header {
+  background: rgba(255,255,255,0.05);
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trade-terminal__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  opacity: 0.5;
+}
+
+.trade-terminal__body {
+  height: 340px;
+  padding: 16px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8125rem;
+  color: #3bf7d2;
+  line-height: 1.6;
+  background: #050505;
+}
+
+.trade-terminal__body::-webkit-scrollbar { width: 4px; }
+.trade-terminal__body::-webkit-scrollbar-track { background: transparent; }
+.trade-terminal__body::-webkit-scrollbar-thumb { background: rgba(59,247,210,0.15); border-radius: 4px; }
+
+.trade-terminal__timestamp {
+  color: rgba(59,247,210,0.4);
+  margin-right: 8px;
+}
+
+.trade-terminal__success { color: #bced62; font-weight: 700; }
+.trade-terminal__fail { color: #ff4d6d; font-weight: 700; }
+.trade-terminal__info { color: rgba(255,255,255,0.6); }
+
+/* ── Trade Execution Row ── */
+.trade-exec-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .trade-exec-row { grid-template-columns: 1fr; }
+}
+
+/* ── Impact Badge ── */
+.trade-impact-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.trade-impact-badge--positive {
+  background: rgba(188,237,98,0.1);
+  border: 1px solid rgba(188,237,98,0.2);
+  color: #bced62;
+}
+
+.trade-impact-badge--negative {
+  background: rgba(255,77,109,0.1);
+  border: 1px solid rgba(255,77,109,0.2);
+  color: #ff4d6d;
+}
+
+/* ── Trade History Table ── */
+.trade-history__thead,
+.trade-history__row {
+  display: grid;
+  grid-template-columns: 0.4fr 1.1fr 0.6fr 1fr 0.9fr 0.7fr 0.5fr 0.6fr 0.8fr;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  align-items: center;
+}
+
+.trade-history__thead {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bondcredit-s2);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-weight: 600;
+}
+
+.trade-history__row {
+  color: var(--bondcredit-white);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 150ms ease;
+}
+
+.trade-history__row:hover { background: rgba(59,247,210,0.025); }
+
+.trade-history__row--success {
+  border-left: 2px solid rgba(59,247,210,0.3);
+}
+
+.trade-history__row--fail {
+  border-left: 2px solid rgba(255,77,109,0.3);
+}
+
+@media (max-width: 768px) {
+  .trade-history__thead,
+  .trade-history__row {
+    grid-template-columns: 0.3fr 1fr 0.5fr 1fr 0.6fr;
+    font-size: 0.6875rem;
+  }
+  .trade-history__thead span:nth-child(n+6),
+  .trade-history__row span:nth-child(n+6) { display: none; }
+}
+
+/* ── Credit Chip ── */
+.trade-credit-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.625rem;
+  font-weight: 800;
+}
+
+.trade-credit-chip--up {
+  background: rgba(59,247,210,0.1);
+  color: #3bf7d2;
+}
+
+.trade-credit-chip--down {
+  background: rgba(255,77,109,0.1);
+  color: #ff4d6d;
+}
+
+/* ── Stats Pills ── */
+.trade-stats-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+
+.trade-stats-pill--green {
+  background: rgba(59,247,210,0.08);
+  color: #3bf7d2;
+}
+
+.trade-stats-pill--red {
+  background: rgba(255,77,109,0.08);
+  color: #ff4d6d;
+}
+
+/* ── Running Score ── */
+.trade-running-score {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(188,237,98,0.04);
+  border: 1px dashed rgba(188,237,98,0.15);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+}
+
+/* ── Ingest Button ── */
+.trade-ingest-btn {
+  padding: 16px;
+  border-radius: 12px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid rgba(59,247,210,0.55);
+  background: rgba(59,247,210,0.11);
+  color: #3bf7d2;
+  transition: all 200ms ease;
+}
+
+.trade-ingest-btn:hover {
+  background: rgba(59,247,210,0.2);
+  transform: translateY(-1px);
+}
+
+.trade-ingest-btn:disabled {
+  cursor: wait;
+  transform: none;
+}
+
+/* ── Reward Section ── */
+.trade-reward-section {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.trade-reward__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.trade-reward__track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.trade-reward__fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.trade-reward__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(188,237,98,0.06);
+  border: 1px solid rgba(188,237,98,0.2);
+}
+
+.trade-reward__card--celebrate {
+  animation: trade-celebrate 0.6s ease;
+  box-shadow: 0 0 30px rgba(188,237,98,0.15);
+}
+
+@keyframes trade-celebrate {
+  0% { transform: scale(0.95); opacity: 0; }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Credit Factor Rows ── */
+.trade-factor-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.trade-factor-row:last-child { border-bottom: none; }
+
+/* ── Wallet Token ── */
+.trade-wallet-token {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+}
+
+.trade-wallet-token__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(59,247,210,0.08);
+  border: 1px solid rgba(59,247,210,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  color: #3bf7d2;
+}
+
+/* ── Capabilities ── */
+.trade-capabilities {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.trade-capability {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(59,247,210,0.03);
+  border: 1px solid rgba(59,247,210,0.08);
+}
+
+/* ── Spin Animation ── */
+.trade-spin {
+  animation: trade-spin-anim 1s linear infinite;
+}
+
+@keyframes trade-spin-anim {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
