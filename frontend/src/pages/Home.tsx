@@ -123,6 +123,117 @@ const Home: React.FC = () => {
         </div>
       </Section>
 
+      {/* ═══ NEW: Agentic Trading Section ═══ */}
+      <Section id="trade" style={{ background: 'linear-gradient(180deg, #050505 0%, #0a0a0a 50%, #050505 100%)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '80px', alignItems: 'center', textAlign: 'left' }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <span style={{ color: '#ffffff', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.875rem' }}>NEW</span>
+              <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)' }} />
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.875rem' }}>Agentic Trading</span>
+            </div>
+            <h2 style={{ fontSize: '3rem', marginBottom: '24px', lineHeight: 1.1, fontWeight: 900, letterSpacing: '-0.02em' }}>
+              Trade on <br /><span style={{ color: '#ffffff' }}>Uniswap</span> <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>via</span> <span style={{ color: '#ffffff' }}>Onchain OS</span>
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.125rem', marginBottom: '32px', lineHeight: 1.7 }}>
+              Deploy autonomous AI trading agents that execute swaps on Uniswap V3 through Onchain OS agentic wallets. Every trade builds your on-chain credit score — unlocking credit lines at scale.
+            </p>
+
+            {/* Capability Badges */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '40px' }}>
+              {[
+                { label: 'DEX Swap', desc: 'Uniswap V3' },
+                { label: 'Price Data', desc: 'Real-time feeds' },
+                { label: 'x402 Payments', desc: 'Autonomous settlement' },
+                { label: 'Credit Scoring', desc: '+1 success / −1 failure' },
+              ].map((cap) => (
+                <div key={cap.label} style={{
+                  padding: '14px 16px',
+                  borderRadius: '10px',
+                  background: '#000000',
+                  border: '1px solid #1a1a1a',
+                  transition: 'border-color 200ms ease',
+                }}>
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#ffffff', marginBottom: '2px' }}>{cap.label}</div>
+                  <div style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.4)' }}>{cap.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <Link to="/trade" style={{
+                padding: '14px 36px',
+                borderRadius: '50px',
+                background: '#ffffff',
+                color: '#000000',
+                fontWeight: 800,
+                fontSize: '0.9375rem',
+                textDecoration: 'none',
+                transition: 'opacity 200ms',
+                border: 'none',
+              }}>Start Trading</Link>
+              <Link to="/dashboard" style={{
+                padding: '14px 36px',
+                borderRadius: '50px',
+                background: 'transparent',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.9375rem',
+                textDecoration: 'none',
+                border: '1px solid #2a2a2a',
+                transition: 'border-color 200ms',
+              }}>View Dashboard</Link>
+            </div>
+          </div>
+
+          {/* Trade Terminal Mock */}
+          <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #1a1a1a', background: '#000000' }}>
+            {/* Terminal Header */}
+            <div style={{ background: '#0a0a0a', padding: '10px 16px', borderBottom: '1px solid #1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.05em', color: '#ffffff' }}>BOND_AGENT_TRADE</span>
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff4d6d', opacity: 0.5 }} />
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffb066', opacity: 0.5 }} />
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3bf7d2', opacity: 0.5 }} />
+              </div>
+            </div>
+            {/* Terminal Body */}
+            <div style={{ padding: '24px', fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.8125rem', lineHeight: 1.8, color: 'rgba(255,255,255,0.5)' }}>
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:14:02]</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>💳 x402 payment complete...</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:14:03]</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>✅ AMLBOT review completed</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:14:04]</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>📊 Scoring Algorithm unlocked</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:14:05]</span> <span style={{ color: '#ffffff', fontWeight: 700 }}>🚀 It's time to Bond</span></div>
+              <div style={{ height: '1px', background: '#1a1a1a', margin: '12px 0' }} />
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:15:12]</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>&gt; Initiating Uniswap V3 swap: 0.5 ETH → USDC</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:15:14]</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>&gt; Optimal route: Uniswap V3 (0.05% fee)</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:15:16]</span> <span style={{ color: '#ffffff', fontWeight: 700 }}>[SUCCESS] 0.5 ETH → 1,842.50 USDC</span></div>
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:15:16]</span> <span style={{ color: 'rgba(255,255,255,0.6)' }}>&gt; Credit Score: +1</span></div>
+              <div style={{ height: '1px', background: '#1a1a1a', margin: '12px 0' }} />
+              <div><span style={{ color: 'rgba(255,255,255,0.25)' }}>[09:16:30]</span> <span style={{ color: '#ffffff', fontWeight: 700 }}>🏆 $100 Credit Line UNLOCKED — Score: 10</span></div>
+            </div>
+            {/* Score Bar */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>Credit Score</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>10</span>
+              </div>
+              <div style={{
+                padding: '6px 16px',
+                borderRadius: '50px',
+                background: '#ffffff',
+                color: '#000000',
+                fontSize: '0.6875rem',
+                fontWeight: 800,
+              }}>
+                CREDIT LINE UNLOCKED
+              </div>
+            </div>
+          </div>
+        </div>
+      </Section>
+
       {/* Credit Section */}
       <Section id="credit" style={{ background: 'linear-gradient(0deg, var(--bondcredit-bg) 0%, var(--bondcredit-bg2) 100%)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '80px', alignItems: 'center', textAlign: 'left' }}>
