@@ -9,6 +9,7 @@ import SkillPage from './pages/SkillPage';
 import CreatePage from './pages/CreatePage';
 import TradingDashboardPage from './pages/TradingDashboardPage';
 import TradePage from './pages/TradePage';
+import SwapPage from './pages/SwapPage';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -22,6 +23,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/create" element={<CreatePage />} />
       <Route path="/dashboard" element={<TradingDashboardPage />} />
       <Route path="/trade" element={<TradePage />} />
+      <Route path="/swap" element={<SwapPage />} />
     </Routes>
   );
 };
