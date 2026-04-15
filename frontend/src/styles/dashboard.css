@@ -49,10 +49,11 @@
 }
 
 .dash-topbar__title {
-  font-size: 1.75rem;
-  font-weight: 800;
+  font-size: 2rem;
+  font-weight: 900;
   margin: 0;
-  color: var(--bondcredit-white);
+  color: #ffffff;
+  letter-spacing: -0.02em;
 }
 
 .dash-topbar__sub {
@@ -87,18 +88,17 @@
   0%,100% { opacity: 1; } 50% { opacity: 0.35; }
 }
 
-/* ── Shared Card ── */
+/* ── Shared Card (OKX-flat) ── */
 .dash-card {
-  background: rgba(14, 14, 14, 0.85);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px;
+  background: #000000;
+  border: 1px solid #1a1a1a;
+  border-radius: 12px;
   padding: 20px;
-  transition: border-color 250ms ease, box-shadow 250ms ease;
+  transition: border-color 250ms ease;
 }
 
 .dash-card:hover {
-  border-color: rgba(59,247,210,0.22);
-  box-shadow: 0 0 20px rgba(59,247,210,0.05);
+  border-color: #2a2a2a;
 }
 
 .dash-card__header {
@@ -109,11 +109,11 @@
 }
 
 .dash-card__title {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--bondcredit-s2);
-  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  font-weight: 800;
   margin: 0;
 }
 
@@ -421,36 +421,36 @@
 }
 
 /* ═══════════════════════════════════════════════
-   Trade Panel
+   Trade Panel (OKX-style)
    ═══════════════════════════════════════════════ */
 .dash-trade__tabs {
   display: flex;
-  gap: 3px;
-  padding: 3px;
-  border-radius: 10px;
-  background: rgba(0,0,0,0.28);
-  border: 1px solid rgba(255,255,255,0.05);
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
   margin: 12px 0 16px;
 }
 
 .dash-trade__tab {
   flex: 1;
-  padding: 7px 4px;
+  padding: 8px 4px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
-  color: var(--bondcredit-s2);
-  font-size: 0.6875rem;
-  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.75rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 200ms ease;
   font-family: inherit;
 }
 
-.dash-trade__tab:hover { color: var(--bondcredit-white); }
-.dash-trade__tab.active.green { background: rgba(59,247,210,0.12); color: #3bf7d2; }
-.dash-trade__tab.active.red { background: rgba(255,77,109,0.12); color: #ff4d6d; }
-.dash-trade__tab.active:not(.green):not(.red) { background: rgba(59,247,210,0.12); color: #3bf7d2; }
+.dash-trade__tab:hover { color: #ffffff; }
+.dash-trade__tab.active.green { background: #ffffff; color: #000000; }
+.dash-trade__tab.active.red { background: #ff4d6d; color: #ffffff; }
+.dash-trade__tab.active:not(.green):not(.red) { background: #ffffff; color: #000000; }
 
 .dash-trade__form {
   display: flex;
@@ -463,19 +463,22 @@
   flex-direction: column;
   gap: 4px;
   font-size: 0.6875rem;
-  color: var(--bondcredit-s2);
-  font-weight: 500;
+  color: rgba(255,255,255,0.5);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .dash-trade__select,
 .dash-trade__input {
   width: 100%;
   padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(0,0,0,0.3);
-  color: var(--bondcredit-white);
+  border-radius: 8px;
+  border: 1px solid #1a1a1a;
+  background: #0a0a0a;
+  color: #ffffff;
   font-size: 0.8125rem;
+  font-weight: 500;
   font-family: inherit;
   outline: none;
   transition: border-color 200ms ease;
@@ -485,7 +488,7 @@
 
 .dash-trade__select:focus,
 .dash-trade__input:focus {
-  border-color: rgba(59,247,210,0.3);
+  border-color: #ffffff;
 }
 
 .dash-trade__input-wrap {
@@ -502,49 +505,57 @@
   top: 50%;
   transform: translateY(-50%);
   font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--bondcredit-s2);
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
 }
 
 .dash-trade__exec {
   width: 100%;
   padding: 12px;
-  border: none;
-  border-radius: 10px;
+  border: 1px solid #1a1a1a;
+  border-radius: 50px;
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
   transition: all 200ms ease;
   font-family: inherit;
   margin-top: 4px;
+  background: #0a0a0a;
+  color: rgba(255,255,255,0.6);
+}
+
+.dash-trade__exec:hover {
+  background: #1a1a1a;
+  color: #ffffff;
 }
 
 .dash-trade__exec--green {
-  background: linear-gradient(135deg, rgba(59,247,210,0.2) 0%, rgba(59,247,210,0.08) 100%);
-  border: 1px solid rgba(59,247,210,0.35);
-  color: #3bf7d2;
+  background: #ffffff;
+  border: 1px solid #ffffff;
+  color: #000000;
 }
 
-.dash-trade__exec--green:hover { background: rgba(59,247,210,0.25); }
+.dash-trade__exec--green:hover { background: #e0e0e0; }
 
 .dash-trade__exec--red {
-  background: linear-gradient(135deg, rgba(255,77,109,0.2) 0%, rgba(255,77,109,0.06) 100%);
-  border: 1px solid rgba(255,77,109,0.35);
-  color: #ff4d6d;
+  background: #ff4d6d;
+  border: 1px solid #ff4d6d;
+  color: #ffffff;
 }
 
-.dash-trade__exec--red:hover { background: rgba(255,77,109,0.25); }
+.dash-trade__exec--red:hover { background: #e04360; }
 
 .dash-trade__hint {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.6875rem;
-  color: var(--bondcredit-s2);
+  color: rgba(255,255,255,0.5);
   padding: 8px 12px;
   border-radius: 8px;
-  background: rgba(59,247,210,0.03);
-  border: 1px dashed rgba(59,247,210,0.12);
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
+  margin-top: 8px;
 }
 
 /* ═══════════════════════════════════════════════
@@ -566,17 +577,21 @@
   padding: 6px 16px;
   border: none;
   background: transparent;
-  color: var(--bondcredit-s2);
+  color: rgba(255,255,255,0.35);
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 200ms ease;
   font-family: inherit;
   position: relative;
 }
 
+.dash-orders__tab:hover {
+  color: rgba(255,255,255,0.7);
+}
+
 .dash-orders__tab.active {
-  color: #3bf7d2;
+  color: #ffffff;
 }
 
 .dash-orders__tab.active::after {
@@ -586,16 +601,17 @@
   left: 16px;
   right: 16px;
   height: 2px;
-  background: #3bf7d2;
+  background: #ffffff;
   border-radius: 2px;
 }
 
 .dash-orders__count {
   font-size: 0.625rem;
-  color: var(--bondcredit-s2);
+  color: rgba(255,255,255,0.5);
+  font-weight: 700;
   padding: 3px 10px;
   border-radius: 99px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid #1a1a1a;
 }
 
 .dash-orders__table { display: flex; flex-direction: column; }
