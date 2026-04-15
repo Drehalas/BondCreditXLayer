@@ -9,6 +9,7 @@ export type TradeToken = {
   name: string;
   address: string;
   decimals: number;
+  logoURI?: string;
   isStable: boolean;
   enabled: boolean;
 };
@@ -27,6 +28,7 @@ type UniswapTokenListToken = {
   name?: string;
   symbol?: string;
   decimals?: number;
+  logoURI?: string;
 };
 
 type UniswapTokenList = {
@@ -77,12 +79,14 @@ function tokenToTradeToken(token: UniswapTokenListToken): TradeToken {
   const symbol = typeof token.symbol === 'string' ? token.symbol.trim().toUpperCase() : '';
   const name = typeof token.name === 'string' ? token.name.trim() : '';
   const address = typeof token.address === 'string' ? token.address.trim() : '';
+  const logoURI = typeof token.logoURI === 'string' && token.logoURI.trim() ? token.logoURI.trim() : undefined;
 
   return {
     symbol,
     name,
     address,
     decimals: Number(token.decimals ?? 18),
+    logoURI,
     isStable: STABLE_SYMBOLS.has(symbol),
     enabled: true,
   };
@@ -230,6 +234,7 @@ function normalizeOkxTokenCandidate(candidate: OkxTokenCandidate, targetChainId:
     ]);
     const symbol = readStringCandidate(source, ['symbol', 'tokenSymbol', 'baseSymbol', 'displaySymbol']);
     const name = readStringCandidate(source, ['name', 'tokenName', 'displayName']);
+    const logoURI = readStringCandidate(source, ['logoURI', 'tokenLogoUrl', 'logo', 'icon']);
     const decimals = readNumberCandidate(source, ['decimals', 'decimal', 'tokenDecimals']) ?? 18;
 
     if (!address || !isAddress(address)) continue;
@@ -245,6 +250,7 @@ function normalizeOkxTokenCandidate(candidate: OkxTokenCandidate, targetChainId:
       name: normalizedName,
       address: normalizedAddress,
       decimals: Math.trunc(decimals),
+      logoURI,
       isStable: STABLE_SYMBOLS.has(normalizedSymbol),
       enabled: true,
     };

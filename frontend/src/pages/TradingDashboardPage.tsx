@@ -34,6 +34,7 @@ interface TradeToken {
   symbol: string;
   address: string;
   decimals: number;
+  logoURI?: string;
 }
 
 interface TradablePair {

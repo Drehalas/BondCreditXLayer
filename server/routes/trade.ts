@@ -426,11 +426,15 @@ async function handleTokens(_req: Request, res: Response, next: NextFunction) {
           pair: `${tokenIn.symbol}/${tokenOut.symbol}`,
           tokenIn: {
             symbol: tokenIn.symbol,
+            name: tokenIn.name,
+            logoURI: tokenIn.logoURI,
             address: tokenIn.address,
             decimals: tokenIn.decimals,
           },
           tokenOut: {
             symbol: tokenOut.symbol,
+            name: tokenOut.name,
+            logoURI: tokenOut.logoURI,
             address: tokenOut.address,
             decimals: tokenOut.decimals,
           },

@@ -17,8 +17,10 @@ interface Eip1193Provider {
 
 interface TradeToken {
   symbol: string;
+  name?: string;
   address: string;
   decimals: number;
+  logoURI?: string;
 }
 
 interface TradablePair {
@@ -66,6 +68,100 @@ function formatRelativeTime(iso: string): string {
   if (deltaSeconds < 3600) return `${Math.floor(deltaSeconds / 60)}m ago`;
   if (deltaSeconds < 86400) return `${Math.floor(deltaSeconds / 3600)}h ago`;
   return `${Math.floor(deltaSeconds / 86400)}d ago`;
+}
+
+function formatTokenDisplay(token: TradeToken): string {
+  const trimmedName = token.name?.trim();
+  return trimmedName ? `${token.symbol} (${trimmedName})` : token.symbol;
+}
+
+function parsePairSymbols(pair: string): { tokenInSymbol: string; tokenOutSymbol: string } | null {
+  if (!pair || typeof pair !== 'string') return null;
+  const [left, right] = pair.split('/');
+  if (!left || !right) return null;
+  const tokenInSymbol = left.trim().toUpperCase();
+  const tokenOutSymbol = right.trim().toUpperCase();
+  if (!tokenInSymbol || !tokenOutSymbol) return null;
+  return { tokenInSymbol, tokenOutSymbol };
+}
+
+const TokenLogo: React.FC<{ symbol: string; logoURI?: string; size?: number }> = ({ symbol, logoURI, size = 18 }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const initial = symbol.trim().charAt(0).toUpperCase() || '?';
+
+  if (logoURI && !imageFailed) {
+    return (
+      <img
+        src={logoURI}
+        alt={`${symbol} logo`}
+        width={size}
+        height={size}
+        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        onError={() => setImageFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-label={`${symbol} logo fallback`}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: '50%',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: `${Math.max(10, Math.floor(size * 0.55))}px`,
+        fontWeight: 700,
+        color: '#0f172a',
+        background: 'linear-gradient(135deg, #d1fae5 0%, #93c5fd 100%)',
+        flexShrink: 0,
+      }}
+    >
+      {initial}
+    </span>
+  );
+};
+
+function normalizeTradeToken(value: unknown): TradeToken | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const symbol = typeof raw.symbol === 'string' ? raw.symbol.trim().toUpperCase() : '';
+  const address = typeof raw.address === 'string' ? raw.address.trim() : '';
+  const decimals = Number(raw.decimals);
+  const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+  const logoURI = typeof raw.logoURI === 'string' && raw.logoURI.trim() ? raw.logoURI.trim() : undefined;
+
+  if (!symbol || !isAddress(address) || !Number.isFinite(decimals)) {
+    return null;
+  }
+
+  return {
+    symbol,
+    address,
+    decimals,
+    name: name || undefined,
+    logoURI,
+  };
+}
+
+function normalizeTradablePair(value: unknown): TradablePair | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const tokenIn = normalizeTradeToken(raw.tokenIn);
+  const tokenOut = normalizeTradeToken(raw.tokenOut);
+  if (!tokenIn || !tokenOut) return null;
+
+  const pair = typeof raw.pair === 'string' && raw.pair.trim()
+    ? raw.pair.trim().toUpperCase()
+    : `${tokenIn.symbol}/${tokenOut.symbol}`;
+
+  return {
+    pair,
+    tokenIn,
+    tokenOut,
+  };
 }
 
 async function ensureWalletOnExpectedChain(provider: BrowserProvider, injected: Eip1193Provider): Promise<void> {
@@ -320,9 +416,24 @@ const TradePage: React.FC = () => {
     return pairs.filter(item => (
       item.pair.toUpperCase().includes(query)
       || item.tokenIn.symbol.toUpperCase().includes(query)
+      || (item.tokenIn.name ?? '').toUpperCase().includes(query)
       || item.tokenOut.symbol.toUpperCase().includes(query)
+      || (item.tokenOut.name ?? '').toUpperCase().includes(query)
     ));
   }, [pairs, pairSearch]);
+
+  const tokenLogoBySymbol = useMemo(() => {
+    const logoMap = new Map<string, string>();
+    for (const pair of pairs) {
+      if (pair.tokenIn.logoURI && !logoMap.has(pair.tokenIn.symbol)) {
+        logoMap.set(pair.tokenIn.symbol, pair.tokenIn.logoURI);
+      }
+      if (pair.tokenOut.logoURI && !logoMap.has(pair.tokenOut.symbol)) {
+        logoMap.set(pair.tokenOut.symbol, pair.tokenOut.logoURI);
+      }
+    }
+    return logoMap;
+  }, [pairs]);
 
   const activeHistoryIdentity = historyScope === 'wallet' ? connectedWallet : agentWallet.trim();
 
@@ -335,7 +446,11 @@ const TradePage: React.FC = () => {
       if (!response.ok) {
         throw new Error(typeof payload?.error === 'string' ? payload.error : `Failed to load token pairs (${response.status})`);
       }
-      const nextPairs = Array.isArray(payload?.tradablePairs) ? payload.tradablePairs as TradablePair[] : [];
+      const nextPairs = Array.isArray(payload?.tradablePairs)
+        ? payload.tradablePairs
+          .map(normalizeTradablePair)
+          .filter((pair): pair is TradablePair => pair !== null)
+        : [];
       setPairs(nextPairs);
       if (nextPairs.length > 0) {
         setSelectedPair(current => (current && nextPairs.some(item => item.pair === current) ? current : nextPairs[0].pair));
@@ -820,10 +935,24 @@ const TradePage: React.FC = () => {
                   >
                     {filteredPairs.length === 0 && <option value="">No pair found</option>}
                     {filteredPairs.map(item => (
-                      <option key={item.pair} value={item.pair}>{item.pair}</option>
+                      <option key={item.pair} value={item.pair}>
+                        {`${item.pair} - ${item.tokenIn.symbol} -> ${item.tokenOut.symbol}`}
+                      </option>
                     ))}
                   </select>
                 </label>
+                {selectedPairMeta && (
+                  <div className="dash-trade__hint" style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <TokenLogo symbol={selectedPairMeta.tokenIn.symbol} logoURI={selectedPairMeta.tokenIn.logoURI} size={18} />
+                      <span>{`In: ${formatTokenDisplay(selectedPairMeta.tokenIn)}`}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <TokenLogo symbol={selectedPairMeta.tokenOut.symbol} logoURI={selectedPairMeta.tokenOut.logoURI} size={18} />
+                      <span>{`Out: ${formatTokenDisplay(selectedPairMeta.tokenOut)}`}</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="dash-orders__table" style={{ maxHeight: '220px', overflowY: 'auto' }}>
                 <div className="trade-history__thead" style={{ gridTemplateColumns: '1.5fr 1fr 1fr 1fr' }}>
@@ -839,8 +968,14 @@ const TradePage: React.FC = () => {
                     style={{ gridTemplateColumns: '1.5fr 1fr 1fr 1fr', cursor: 'pointer' }}
                   >
                     <span className="dash-orders__pair">{item.pair}</span>
-                    <span>{item.tokenIn.symbol}</span>
-                    <span>{item.tokenOut.symbol}</span>
+                    <span title={formatTokenDisplay(item.tokenIn)} style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <TokenLogo symbol={item.tokenIn.symbol} logoURI={item.tokenIn.logoURI} size={18} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatTokenDisplay(item.tokenIn)}</span>
+                    </span>
+                    <span title={formatTokenDisplay(item.tokenOut)} style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <TokenLogo symbol={item.tokenOut.symbol} logoURI={item.tokenOut.logoURI} size={18} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatTokenDisplay(item.tokenOut)}</span>
+                    </span>
                     <button className="dash-orders__tab" onClick={() => setSelectedPair(item.pair)}>Use</button>
                   </div>
                 ))}
@@ -968,7 +1103,25 @@ const TradePage: React.FC = () => {
               {history.map(item => (
                 <div key={item.id} className="trade-history__row" style={{ gridTemplateColumns: '60px 1fr 90px 100px 90px 140px 100px' }}>
                   <span>{item.id}</span>
-                  <span className="dash-orders__pair">{item.pair}</span>
+                  <span className="dash-orders__pair" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                    {(() => {
+                      const parsedPair = parsePairSymbols(item.pair);
+                      if (!parsedPair) {
+                        return <span>{item.pair}</span>;
+                      }
+
+                      const inLogo = tokenLogoBySymbol.get(parsedPair.tokenInSymbol);
+                      const outLogo = tokenLogoBySymbol.get(parsedPair.tokenOutSymbol);
+
+                      return (
+                        <>
+                          <TokenLogo symbol={parsedPair.tokenInSymbol} logoURI={inLogo} size={16} />
+                          <TokenLogo symbol={parsedPair.tokenOutSymbol} logoURI={outLogo} size={16} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.pair}</span>
+                        </>
+                      );
+                    })()}
+                  </span>
                   <span>{sideLabel(item.side)}</span>
                   <span>{item.amount}</span>
                   <span style={{ color: item.status === 'SUCCESS' ? '#3bf7d2' : '#ff4d6d' }}>{item.status}</span>
