@@ -1,14 +1,14 @@
 import React from 'react';
 
-const SKILL_CONTENT = `# BondCredit Agent
+const SKILL_CONTENT = `# BondCredit Agent Skill
 
 ## Description
 
-Hybrid on-chain/off-chain agent enabling enrollment, autonomous credit application with x402 guarantee, and reward growth through repayment.
+Machine-readable contract for backend automation flows: enroll identity, update profile, apply credit, repay guarantees, and execute autonomous trades on Uniswap V3. Designed for AI agent ingestion.
 
 ## Base URL
 
-http://localhost:3000
+https://api.bond.credit
 
 ## Authentication
 
@@ -16,12 +16,13 @@ None
 
 ---
 
-## Agent Flow
+## Agent Economy Loop
 
-1. Land: Enroll with email or wallet linked to your Onchain OS agent.
-2. Install: Download this skill file and send it to your agent.
-3. Apply: Agent calls the credit apply capability to subscribe (if needed), score, request limit, and create x402 guarantee.
-4. Earn Rewards: Agent repays to improve score and unlock higher credit line.
+1. **Enroll**: Link wallet to BondCredit identity.
+2. **Execute**: Trade on Uniswap V3 via the execution endpoint.
+3. **Analyze**: Backend verifies transaction success and evaluates profitability.
+4. **Scoring**: Successful/Profitable trades add +1 to your credit score.
+5. **Unlock**: Score milestones automatically unlock higher credit lines.
 
 ---
 
@@ -36,9 +37,9 @@ Endpoint: POST /enroll
 Request:
 \`\`\`json
 {
-  "agentId": "string",
+  "walletAddress": "0x...",
   "email": "agent@domain.com",
-  "walletAddress": "0x..."
+  "agentName": "Alpha-Agent-v1"
 }
 \`\`\`
 
@@ -46,61 +47,170 @@ Response:
 \`\`\`json
 {
   "enrolled": true,
-  "agentId": "string",
-  "email": "agent@domain.com",
-  "walletAddress": "0x...",
-  "subscription": {
-    "active": false,
-    "expiryDate": "YYYY-MM-DD",
-    "daysLeft": 0,
-    "paymentsMade": 0
-  },
+  "agentId": 12,
   "credit": {
-    "score": 700,
-    "tier": "Prime",
-    "line": "0.5000 XLAYER"
-  },
-  "message": "Enrollment complete. Download skill.md and connect it to your agent."
+    "score": 0,
+    "tier": "Standard",
+    "line": "0.0100 OKB"
+  }
 }
 \`\`\`
 
 ---
 
-### Install: Retrieve Agent Skill
+### Trading: Unified Swap Flow (Uniswap V3)
 
-Download the skill file that your external agent uses for capability discovery.
+#### 1. Discovery: Trade Tokens Catalog
 
-Endpoint: GET /.well-known/skill.md
+Retrieve supported tokens and high-liquidity pairs.
+
+Endpoint: GET /tokens
+
+Response:
+\`\`\`json
+{
+  "network": "xlayer-mainnet",
+  "count": 12,
+  "tokens": [
+    { "symbol": "ETH", "address": "0x...", "decimals": 18 },
+    { "symbol": "USDC", "address": "0x...", "decimals": 6 }
+  ],
+  "tradablePairs": [
+    { "pair": "ETH/USDC", "tokenIn": { "symbol": "ETH" }, "tokenOut": { "symbol": "USDC" } }
+  ]
+}
+\`\`\`
+
+#### 2. Pricing: Swap Quote
+
+Fetch expect output and price impact data.
+
+Endpoint: GET /quote
+
+Request:
+\`\`\`json
+{
+  "tokenIn": "ETH",
+  "tokenOut": "USDC",
+  "amount": 1,
+  "userAddress": "0x..."
+}
+\`\`\`
+
+Response:
+\`\`\`json
+{
+  "pair": "ETH/USDC",
+  "amount": 1,
+  "expectedOutput": "2450.50",
+  "priceImpact": "0.05%",
+  "route": { "protocol": "Uniswap V3" }
+}
+\`\`\`
+
+#### 3. Execution: Build Swap Transaction
+
+Generate encoded calldata payload for on-chain execution.
+
+Endpoint: GET /build-tx
+
+Request:
+\`\`\`json
+{
+  "tokenIn": "ETH",
+  "tokenOut": "USDC",
+  "amount": 1,
+  "userAddress": "0x..."
+}
+\`\`\`
+
+Response:
+\`\`\`json
+{
+  "to": "0xRouter",
+  "data": "0x...",
+  "value": "1000000000000000000",
+  "gasLimit": "250000"
+}
+\`\`\`
+
+#### 4. Verification: Store Manual Transaction
+
+Record a manually signed transaction for credit scoring.
+
+Endpoint: POST /store-transaction
+
+Request:
+\`\`\`json
+{
+  "txHash": "0x...",
+  "userId": "0x...",
+  "pair": "ETH/USDC",
+  "side": "BUY",
+  "amount": 1
+}
+\`\`\`
+
+Response:
+\`\`\`json
+{ "recorded": true, "tradeId": 105, "status": "PENDING" }
+\`\`\`
+
+#### 5. Autonomous: Execute Agent Trade
+
+Directly execute a swap using the agent's registered credentials.
+
+Endpoint: POST /execute-trade
+
+Request:
+\`\`\`json
+{
+  "agentId": 12,
+  "tokenIn": "ETH",
+  "tokenOut": "USDC",
+  "amount": 1,
+  "slippageBps": 50,
+  "idempotencyKey": "unique-task-id"
+}
+\`\`\`
+
+Response:
+\`\`\`json
+{
+  "executed": true,
+  "venue": "okx-dex",
+  "trade": {
+    "txHash": "0x...",
+    "status": "SUCCESS"
+  },
+  "score": { "before": 9, "after": 10, "delta": 1 }
+}
+\`\`\`
 
 ---
 
-### Apply: Autonomous Credit Application
+### Credit: Autonomous Application (x402)
 
-Run subscription bootstrap, risk/eligibility checks, credit request, and x402 guarantee issuance.
+Run risk checks, application, and x402 guarantee issuance in one flow.
 
 Endpoint: POST /credit/apply
 
 Request:
 \`\`\`json
 {
-  "agentId": "string",
+  "agentId": 12,
   "amount": 0.1,
   "recipient": "0x...",
-  "service": "autonomous-credit-execution",
-  "endpoint": "bondcredit://credit/apply",
-  "purpose": "arbitrage"
+  "purpose": "yield-strategy"
 }
 \`\`\`
 
-Response (Approved):
+Response:
 \`\`\`json
 {
   "approved": true,
-  "subscribedNow": true,
-  "score": { "value": 700, "tier": "Prime", "updatedAt": "ISO-8601" },
-  "limit": { "current": "0.5000 XLAYER", "used": "0.0000 XLAYER", "available": "0.5000 XLAYER" },
-  "approval": { "approved": true, "creditId": "cred_xxx", "amount": "0.1 OKB", "fee": "0.000050 OKB" },
-  "guarantee": { "guaranteeId": "guar_xxx", "proof": "0x...", "expiresAt": "ISO-8601" }
+  "score": { "value": 700, "tier": "Prime" },
+  "guarantee": { "guaranteeId": "guar_xxx", "proof": "0x..." }
 }
 \`\`\`
 
@@ -108,16 +218,16 @@ Response (Approved):
 
 ### Rewards: Repay and Grow
 
-Submit repayment and receive score/credit-line growth snapshot.
+Submit repayment to improve score and unlock limits.
 
 Endpoint: POST /credit/repay
 
 Request:
 \`\`\`json
 {
-  "agentId": "string",
-  "creditId": "cred_xxx",
-  "amount": 0.0105
+  "agentId": 12,
+  "creditId": "0x...",
+  "amount": 0.105
 }
 \`\`\`
 
@@ -125,61 +235,23 @@ Response:
 \`\`\`json
 {
   "success": true,
-  "repayment": { "success": true, "newScore": 705, "txHash": "0x..." },
-  "growth": { "scoreBefore": 700, "scoreAfter": 705, "lineBefore": "0.5000 XLAYER", "lineAfter": "0.5500 XLAYER" }
+  "growth": { "scoreAfter": 705, "lineAfter": "0.5500 XLAYER" }
 }
 \`\`\`
 
 ---
 
-### Subscription: Check Monitoring Status
+### Governance & Risk
 
-Endpoint: POST /subscription/status
+Assess score, history, rebalance vaults, and fetch volatility.
 
-Request:
-\`\`\`json
-{ "agentId": "string" }
-\`\`\`
+Endpoint: GET /score/status/:agentId
 
----
-
-### Risk: Assess Risk Score
+Endpoint: GET /trades/history/:agentId
 
 Endpoint: POST /risk-score
 
-Request:
-\`\`\`json
-{ "agentId": "string" }
-\`\`\`
-
----
-
-### Guarantee: Issue Credit Guarantee
-
-Endpoint: POST /guarantee
-
-Request:
-\`\`\`json
-{
-  "agentId": "string",
-  "amount": 0.1
-}
-\`\`\`
-
----
-
-### Vault: Rebalance Vault
-
 Endpoint: POST /rebalance
-
-Request:
-\`\`\`json
-{ "vaultId": "string" }
-\`\`\`
-
----
-
-### Analytics: Get Volatility
 
 Endpoint: GET /volatility
 `;
