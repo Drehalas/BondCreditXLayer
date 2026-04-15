@@ -11,6 +11,8 @@ model Agent {
   id                    Int                @id @default(autoincrement())
   walletAddress         String             @unique
   email                 String?
+  subscriptionStatus    AgentSubscriptionStatus?
+  subscriptionTxHash    String?
 
   agentName             String?
   description           String?
@@ -39,12 +41,22 @@ model Agent {
 model TradeExecution {
   id           Int                @id @default(autoincrement())
   agentId      Int
+  actorType    TradeActorType     @default(AGENT)
+  actorId      String?
   pair         String
+  tokenIn      String?
+  tokenOut     String?
   side         TradeSide
   amount       Float
+  amountIn     Float?
+  amountOut    Float?
   status       TradeExecutionStatus
   txHash       String?
   pnlDelta     Float?
+  profit       Float?
+  isProfit     Boolean?
+  evaluatedPrice Float?
+  evaluatedAt  DateTime?
   errorMessage String?
   metadata     Json?
   executedAt   DateTime           @default(now())
@@ -97,6 +109,11 @@ enum TradeExecutionStatus {
   FAILED
 }
 
+enum TradeActorType {
+  USER
+  AGENT
+}
+
 enum TradeSide {
   BUY
   SELL
@@ -108,4 +125,9 @@ enum TradeSide {
 enum CreditUnlockType {
   CREDIT_LINE_SCORE_10
   BONUS_USD_100_AFTER_5_WINS
+}
+
+enum AgentSubscriptionStatus {
+  ACTIVE
+  INACTIVE
 }

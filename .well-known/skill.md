@@ -34,6 +34,8 @@ Endpoint: GET /.well-known/SKILL.md
 - Score rule is deterministic for hackathon mode: successful trade `+1`, failed trade `-1`.
 - Unlock rules: credit line unlock at score `>= 10`; bonus `$100` unlock at 5 successful trades.
 - Manual onboarding endpoints remain unchanged and are still supported.
+- `POST /agent/subscribe` is for agent-only backend subscription via OKX-managed wallet; manual user wallet flow is unchanged.
+- Agent subscription activation is persisted only after on-chain transaction verification succeeds.
 
 ---
 
@@ -213,60 +215,13 @@ Response (rejected):
 
 Endpoint: POST /apply
 
-### Uniswap Trade Execute (server adapter)
+### Unified Swap Flow
 
-Endpoint: POST /trade/execute
+#### Trade Tokens Catalog
 
-Request:
-```json
-{
-  "agentId": 12,
-  "pair": "OKB/USDT",
-  "side": "BUY",
-  "amount": 10,
-  "slippageBps": 50,
-  "tokenIn": "0x...",
-  "tokenOut": "0x..."
-}
-```
+Endpoint: GET /tokens
 
-Response:
-```json
-{
-  "executed": true,
-  "venue": "uniswap-v2",
-  "trade": {
-    "id": 101,
-    "pair": "OKB/USDT",
-    "side": "BUY",
-    "amount": 10,
-    "status": "SUCCESS",
-    "txHash": "0x...",
-    "pnlDelta": 0.012,
-    "errorMessage": null,
-    "executedAt": "ISO-8601"
-  },
-  "score": {
-    "before": 9,
-    "after": 10,
-    "delta": 1,
-    "successfulTrades": 5,
-    "failedTrades": 1
-  },
-  "unlocks": {
-    "creditLineUnlocked": true,
-    "bonusUsd100Unlocked": true,
-    "newlyUnlocked": [
-      "CREDIT_LINE_SCORE_10",
-      "BONUS_USD_100_AFTER_5_WINS"
-    ]
-  }
-}
-```
-
-### Trade Tokens Catalog
-
-Endpoint: GET /trade/tokens
+Compatibility alias: GET /trade/tokens
 
 Returns tokens from backend static token-list JSON (`server/data/uniswap-token-list.json`).
 List is filtered by env scope via `BONDCREDIT_TOKEN_LIST_SCOPE` (`mainnet` or `testnet`).
@@ -296,6 +251,135 @@ Response:
   ]
 }
 ```
+
+#### Quote Swap
+
+Endpoint: GET /quote
+
+Query:
+```text
+tokenIn=0x...&tokenOut=0x...&amount=100&userAddress=0x...
+```
+
+Response:
+```json
+{
+  "pair": "USDC/ETH",
+  "tokenIn": "USDC",
+  "tokenOut": "ETH",
+  "amount": 100,
+  "expectedOutput": "0.03",
+  "priceImpact": "0.2%",
+  "route": { }
+}
+```
+
+#### Build Swap Transaction
+
+Endpoint: GET /build-tx
+
+Query:
+```text
+tokenIn=0x...&tokenOut=0x...&amount=100&userAddress=0x...
+```
+
+Response:
+```json
+{
+  "pair": "USDC/ETH",
+  "tokenIn": "USDC",
+  "tokenOut": "ETH",
+  "amount": 100,
+  "to": "0xRouter",
+  "data": "0xabc...",
+  "value": "0x0"
+}
+```
+
+#### Store Manual Transaction
+
+Endpoint: POST /store-transaction
+
+Compatibility alias: POST /trade/record
+
+Request:
+```json
+{
+  "txHash": "0x...",
+  "userId": "0x...",
+  "pair": "USDC/ETH",
+  "side": "BUY",
+  "amount": 100,
+  "metadata": {
+    "expectedToAddress": "0xRouter",
+    "expectedValueWei": "0",
+    "expectedData": "0x..."
+  }
+}
+```
+
+Response:
+```json
+{
+  "recorded": true,
+  "trade": {
+    "id": 101,
+    "pair": "USDC/ETH",
+    "side": "BUY",
+    "amount": 100,
+    "status": "SUCCESS",
+    "txHash": "0x...",
+    "executedAt": "ISO-8601"
+  }
+}
+```
+
+#### Execute Agent Trade
+
+Endpoint: POST /execute-trade
+
+Compatibility alias: POST /trade/execute
+
+Request:
+```json
+{
+  "agentId": 12,
+  "tokenIn": "USDC",
+  "tokenOut": "ETH",
+  "amount": 100,
+  "slippageBps": 50,
+  "idempotencyKey": "trade-2026-04-14-001"
+}
+```
+
+Response:
+```json
+{
+  "executed": true,
+  "venue": "okx-dex",
+  "trade": {
+    "id": 101,
+    "pair": "USDC/ETH",
+    "side": "BUY",
+    "amount": 100,
+    "status": "SUCCESS",
+    "txHash": "0x...",
+    "executedAt": "ISO-8601"
+  },
+  "score": {
+    "before": 9,
+    "after": 10,
+    "delta": 1,
+    "successfulTrades": 5,
+    "failedTrades": 1
+  }
+}
+```
+
+Notes:
+- OKX builds the transaction, your backend or wallet signs it depending on the flow.
+- Manual flow signs in the frontend and then stores the transaction for backend verification.
+- Agent flow uses backend execution and score updates after verification.
 
 ### Score Status
 
@@ -397,6 +481,31 @@ Request:
   "x402PayloadHash": "0x..."
 }
 ```
+
+### Agent Subscribe (OKX-managed backend signing)
+
+Endpoint: POST /agent/subscribe
+
+Request:
+```json
+{
+  "agentId": "0x..."
+}
+```
+
+Response:
+```json
+{
+  "status": "SUCCESS",
+  "txHash": "0x...",
+  "agentId": "0x..."
+}
+```
+
+Notes:
+- Uses the same on-chain `SubscriptionManager.subscribe()` function as manual subscriptions.
+- Backend submits transaction through OKX-managed wallet integration and verifies tx on-chain before marking ACTIVE.
+- `agentId` is the agent wallet address.
 
 ### Subscription Status
 

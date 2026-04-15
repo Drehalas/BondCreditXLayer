@@ -82,7 +82,7 @@ const Home: React.FC = () => {
 
 <span style="color: #555">// Initialize your Agent</span>
 <span style="color: #7aa7ff">const</span> agent = <span style="color: #7aa7ff">new</span> BondCreditClient({
-  network: <span style="color: #bced62">'xlayer-testnet'</span>,
+  network: <span style="color: #bced62">'xlayer-mainnet'</span>,
   agentId: <span style="color: #bced62">'agent-0x...'</span>
 });
 

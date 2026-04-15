@@ -3,6 +3,7 @@ import {
   Contract,
   JsonRpcProvider,
   Wallet,
+  formatUnits,
   isAddress,
   parseUnits,
 } from 'ethers';
@@ -33,9 +34,20 @@ export interface TradeExecutionResult {
     walletAddress: string;
     tokenIn?: string;
     tokenOut?: string;
+    tokenInSymbol?: string;
+    tokenOutSymbol?: string;
+    amountOut?: number;
     amountInWei?: string;
     amountOutMinWei?: string;
     estimatedAmountOutWei?: string;
+  };
+}
+
+function parsePairSymbols(pair: string): { tokenInSymbol: string; tokenOutSymbol: string } {
+  const [tokenInRaw, tokenOutRaw] = pair.split('/');
+  return {
+    tokenInSymbol: tokenInRaw?.trim().toUpperCase() ?? '',
+    tokenOutSymbol: tokenOutRaw?.trim().toUpperCase() ?? '',
   };
 }
 
@@ -46,6 +58,7 @@ export interface TradeExecutor {
 class UniswapSimulatedExecutor implements TradeExecutor {
   async execute(input: ExecuteTradeInput): Promise<TradeExecutionResult> {
     const normalizedPair = input.pair.trim().toUpperCase();
+    const { tokenInSymbol, tokenOutSymbol } = parsePairSymbols(normalizedPair);
     const slippageBps = Math.max(1, Math.trunc(input.slippageBps ?? 50));
 
     const seed = `${normalizedPair}:${input.side}:${input.amount.toFixed(6)}`;
@@ -66,13 +79,14 @@ class UniswapSimulatedExecutor implements TradeExecutor {
           walletAddress: input.walletAddress,
           tokenIn: input.tokenIn,
           tokenOut: input.tokenOut,
+          tokenInSymbol,
+          tokenOutSymbol,
         },
       };
     }
 
-    const direction = input.side === TradeSide.SELL || input.side === TradeSide.SHORT ? -1 : 1;
-    const pnlRaw = Number(((pseudo % 37) / 1000).toFixed(4));
-    const pnlDelta = Number((pnlRaw * direction).toFixed(4));
+    const amountOut = Number((input.amount * (0.985 + ((pseudo % 30) / 1000))).toFixed(8));
+    const pnlDelta = Number((amountOut - input.amount).toFixed(8));
     const txHash = `0x${randomBytes(32).toString('hex')}`;
 
     return {
@@ -89,6 +103,9 @@ class UniswapSimulatedExecutor implements TradeExecutor {
         walletAddress: input.walletAddress,
         tokenIn: input.tokenIn,
         tokenOut: input.tokenOut,
+          tokenInSymbol,
+          tokenOutSymbol,
+          amountOut,
       },
     };
   }
@@ -129,13 +146,16 @@ class UniswapV2OnchainExecutor implements TradeExecutor {
   private readonly router: UniswapV2RouterContract;
 
   constructor() {
-    const rpcUrl = process.env.XLAYER_TESTNET_RPC_URL;
+    const network = (process.env.BONDCREDIT_NETWORK ?? 'xlayer-mainnet').trim().toLowerCase();
+    const rpcUrl = network === 'xlayer-mainnet'
+      ? process.env.XLAYER_MAINNET_RPC_URL
+      : process.env.XLAYER_TESTNET_RPC_URL;
     const privateKey = process.env.DEPLOYER_PRIVATE_KEY || process.env.VITE_DEPLOYER_PRIVATE_KEY;
     const routerAddress = process.env.BONDCREDIT_UNISWAP_V2_ROUTER;
 
     if (!rpcUrl || !privateKey || !routerAddress) {
       throw new Error(
-        'BONDCREDIT_UNISWAP_V2_ROUTER, XLAYER_TESTNET_RPC_URL, and DEPLOYER_PRIVATE_KEY are required for uniswap-v2 mode',
+        'BONDCREDIT_UNISWAP_V2_ROUTER, active XLAYER RPC URL, and DEPLOYER_PRIVATE_KEY are required for uniswap-v2 mode',
       );
     }
     if (!isAddress(routerAddress)) {
@@ -159,8 +179,11 @@ class UniswapV2OnchainExecutor implements TradeExecutor {
     }
 
     const slippageBps = Math.max(1, Math.min(5_000, Math.trunc(input.slippageBps ?? 50)));
+    const { tokenInSymbol, tokenOutSymbol } = parsePairSymbols(input.pair.trim().toUpperCase());
     const tokenInContract = new Contract(input.tokenIn, ERC20_ABI, this.signer) as Erc20Contract;
+    const tokenOutContract = new Contract(input.tokenOut, ERC20_ABI, this.signer) as Erc20Contract;
     const decimals = Number(await tokenInContract.decimals());
+    const tokenOutDecimals = Number(await tokenOutContract.decimals());
     const amountInWei = parseUnits(String(input.amount), decimals);
     const path = [input.tokenIn, input.tokenOut];
 
@@ -188,8 +211,8 @@ class UniswapV2OnchainExecutor implements TradeExecutor {
       const receipt = await tx.wait();
       const txHash = receipt?.hash ?? tx.hash;
 
-      // Lightweight pnl proxy for hackathon telemetry.
-      const pnlDelta = Number(((input.amount * slippageBps) / 10_000).toFixed(6));
+      const amountOut = Number(formatUnits(estimatedAmountOut, tokenOutDecimals));
+      const pnlDelta = Number((amountOut - input.amount).toFixed(8));
 
       return {
         status: TradeExecutionStatus.SUCCESS,
@@ -205,6 +228,9 @@ class UniswapV2OnchainExecutor implements TradeExecutor {
           walletAddress: input.walletAddress,
           tokenIn: input.tokenIn,
           tokenOut: input.tokenOut,
+          tokenInSymbol,
+          tokenOutSymbol,
+          amountOut,
           amountInWei: amountInWei.toString(),
           amountOutMinWei: amountOutMin.toString(),
           estimatedAmountOutWei: estimatedAmountOut.toString(),
@@ -225,6 +251,8 @@ class UniswapV2OnchainExecutor implements TradeExecutor {
           walletAddress: input.walletAddress,
           tokenIn: input.tokenIn,
           tokenOut: input.tokenOut,
+          tokenInSymbol,
+          tokenOutSymbol,
           amountInWei: amountInWei.toString(),
           amountOutMinWei: amountOutMin.toString(),
           estimatedAmountOutWei: estimatedAmountOut.toString(),

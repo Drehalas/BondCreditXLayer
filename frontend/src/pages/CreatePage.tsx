@@ -85,10 +85,10 @@ function getCreditAmountForTier(tier: string): number {
   return 0.0001;
 }
 
-const DEFAULT_SUBSCRIPTION_MANAGER_ADDRESS = '0xAEA215B9F67E0d87B9B89828A1F2dE365Ef1EAd5';
-const DEFAULT_XLAYER_TESTNET_CHAIN_ID = 1952n;
-const DEFAULT_XLAYER_TESTNET_RPC_URL = 'https://testrpc.xlayer.tech';
-const DEFAULT_XLAYER_TESTNET_EXPLORER_URL = 'https://www.oklink.com/xlayer-test';
+const DEFAULT_SUBSCRIPTION_MANAGER_ADDRESS = '0xCEa6DF320e3233e17e3f66949F51D0ef10ad4a08';
+const DEFAULT_XLAYER_MAINNET_CHAIN_ID = 196n;
+const DEFAULT_XLAYER_MAINNET_RPC_URL = 'https://rpc.xlayer.tech';
+const DEFAULT_XLAYER_MAINNET_EXPLORER_URL = 'https://www.oklink.com/xlayer';
 const SUBSCRIPTION_MANAGER_ABI = [
   'function pricePerDayWei() view returns (uint256)',
   'function subscribe(uint256 daysToBuy) payable returns (uint256 expiry)'
@@ -142,13 +142,13 @@ function getObjectStringField(error: unknown, field: 'shortMessage' | 'message')
 function mapKnownWalletMessage(message: string): string | null {
   const lower = message.toLowerCase();
   if (lower.includes('could not decode result data')) {
-    return 'Could not read subscription pricing from this network. Switch wallet network to XLayer testnet and retry.';
+    return 'Could not read subscription pricing from this network. Switch wallet network to XLayer mainnet and retry.';
   }
   if (lower.includes('could not add network that points to same rpc endpoint')) {
-    return 'XLayer testnet may already be configured in your wallet. Switch to it in MetaMask and retry.';
+    return 'XLayer mainnet may already be configured in your wallet. Switch to it in MetaMask and retry.';
   }
   if (lower.includes('wallet network switch rejected')) {
-    return 'Wallet network switch was rejected. Please switch to XLayer testnet and try again.';
+    return 'Wallet network switch was rejected. Please switch to XLayer mainnet and try again.';
   }
   return null;
 }
@@ -165,11 +165,11 @@ async function addWalletChain(injected: Eip1193Provider, expectedHex: string): P
     method: 'wallet_addEthereumChain',
     params: [{
       chainId: expectedHex,
-      chainName: 'X Layer Testnet',
+      chainName: 'X Layer Mainnet',
       nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
-      rpcUrls: [import.meta.env.VITE_XLAYER_TESTNET_RPC_URL ?? DEFAULT_XLAYER_TESTNET_RPC_URL],
+      rpcUrls: [import.meta.env.VITE_XLAYER_MAINNET_RPC_URL ?? DEFAULT_XLAYER_MAINNET_RPC_URL],
       blockExplorerUrls: [
-        import.meta.env.VITE_XLAYER_TESTNET_EXPLORER_URL ?? DEFAULT_XLAYER_TESTNET_EXPLORER_URL,
+        import.meta.env.VITE_XLAYER_MAINNET_EXPLORER_URL ?? DEFAULT_XLAYER_MAINNET_EXPLORER_URL,
       ],
     }],
   });
@@ -263,8 +263,8 @@ const CreatePage: React.FC = () => {
       await injected.request({ method: 'eth_requestAccounts' });
 
       const expectedChainIdRaw = import.meta.env.VITE_BONDCREDIT_CHAIN_ID;
-      const expectedChainId = expectedChainIdRaw ? BigInt(expectedChainIdRaw) : DEFAULT_XLAYER_TESTNET_CHAIN_ID;
-      setSubscriptionStatus('Switching wallet to XLayer testnet...');
+      const expectedChainId = expectedChainIdRaw ? BigInt(expectedChainIdRaw) : DEFAULT_XLAYER_MAINNET_CHAIN_ID;
+      setSubscriptionStatus('Switching wallet to XLayer mainnet...');
       await ensureWalletOnExpectedChain(provider, injected, expectedChainId);
 
       const signer = await provider.getSigner();
@@ -282,7 +282,7 @@ const CreatePage: React.FC = () => {
       const contractCode = await provider.getCode(subscriptionManagerAddress);
       if (contractCode === '0x') {
         throw new Error(
-          `Subscription contract is not deployed at ${subscriptionManagerAddress} on chainId ${network.chainId.toString()}. Switch wallet to XLayer testnet and retry.`
+          `Subscription contract is not deployed at ${subscriptionManagerAddress} on chainId ${network.chainId.toString()}. Switch wallet to XLayer mainnet and retry.`
         );
       }
 

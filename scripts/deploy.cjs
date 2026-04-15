@@ -28,9 +28,11 @@ async function main() {
   const guarantorAddress = await guarantor.getAddress();
   console.log('PaymentGuarantor:', guarantorAddress);
 
+  const network = await hre.ethers.provider.getNetwork();
+
   const out = {
-    network: 'xlayerTestnet',
-    chainId: 195,
+    network: hre.network.name,
+    chainId: Number(network.chainId),
     deployedAt: new Date().toISOString(),
     contracts: {
       subscriptionManager: subscriptionAddress,

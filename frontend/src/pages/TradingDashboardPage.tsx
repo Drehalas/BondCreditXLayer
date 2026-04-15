@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Zap, BarChart3, Repeat, Shield, ArrowDownLeft, ArrowUpRight, Star } from 'lucide-react';
-import { BrowserProvider, Contract, isAddress, parseUnits } from 'ethers';
+import { AbiCoder, BrowserProvider, Contract, isAddress, parseUnits } from 'ethers';
 import { useBondCredit } from '../context/BondCreditContext';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -9,10 +9,7 @@ import { useBondCredit } from '../context/BondCreditContext';
    ═══════════════════════════════════════════════════════════════ */
 
 const API_BASE_URL = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
-const ROUTER_ADDRESS =
-  import.meta.env.VITE_BONDCREDIT_UNISWAP_V2_ROUTER ??
-  '0x199c0ec9736e651582236a282f1647fdf320078b';
-const EXPECTED_CHAIN_ID = BigInt(import.meta.env.VITE_BONDCREDIT_CHAIN_ID ?? '1952');
+const EXPECTED_CHAIN_ID = BigInt(import.meta.env.VITE_BONDCREDIT_CHAIN_ID ?? '196');
 
 interface Eip1193Provider {
   request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
@@ -138,6 +135,30 @@ async function ensureWalletOnExpectedChain(provider: BrowserProvider, injected: 
     method: 'wallet_switchEthereumChain',
     params: [{ chainId: expectedHex }],
   });
+}
+
+async function createProviderAfterChainSync(injected: Eip1193Provider): Promise<BrowserProvider> {
+  const initialProvider = new BrowserProvider(injected);
+  await ensureWalletOnExpectedChain(initialProvider, injected);
+  // Recreate provider after potential chain change event to avoid stale-network errors.
+  await injected.request({ method: 'eth_chainId' });
+  return new BrowserProvider(injected);
+}
+
+async function validateManualTradePreflight(provider: BrowserProvider, tokenAddress: string): Promise<void> {
+  const network = await provider.getNetwork();
+  if (network.chainId !== EXPECTED_CHAIN_ID) {
+    throw new Error(
+      `Wrong network connected. Expected chain ${EXPECTED_CHAIN_ID.toString()}, got ${network.chainId.toString()}. Switch network and retry.`,
+    );
+  }
+
+  const code = await provider.getCode(tokenAddress);
+  if (!code || code === '0x') {
+    throw new Error(
+      `Token contract ${tokenAddress} is not deployed on chain ${network.chainId.toString()}. Check network and selected token pair.`,
+    );
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -270,6 +291,135 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
 /* ═══════════════════════════════════════════════════════════════
    Main Dashboard Component
    ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Validate that router contract is deployed at the given address
+ */
+async function validateRouterContract(
+  provider: BrowserProvider,
+  routerAddress: string,
+): Promise<{ valid: boolean; message?: string }> {
+  if (!isAddress(routerAddress)) {
+    return { valid: false, message: `Invalid router address format: ${routerAddress}` };
+  }
+
+  const code = await provider.getCode(routerAddress);
+  if (!code || code === '0x') {
+    return {
+      valid: false,
+      message: `Router contract not deployed at ${routerAddress}. Check spender address from /build-tx response.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Encode ERC20 approve() function call for manual transaction building
+ */
+function encodeERC20Approve(spenderAddress: string, amount: bigint): string {
+  try {
+    // ERC20 approve(address spender, uint256 amount)
+    const encoded = AbiCoder.defaultAbiCoder().encode(
+      ['address', 'uint256'],
+      [spenderAddress, amount],
+    );
+    // Function selector for approve(address,uint256) = 0x095ea7b3
+    return '0x095ea7b3' + encoded.slice(2);
+  } catch (error) {
+    throw new Error(`Failed to encode approve() call: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Pre-estimate gas for approval transaction before sending to MetaMask
+ */
+async function preEstimateApprovalGas(
+  provider: BrowserProvider,
+  tokenAddress: string,
+  spenderAddress: string,
+  amount: bigint,
+  signer: Awaited<ReturnType<BrowserProvider['getSigner']>>,
+): Promise<{ gasEstimate: bigint; success: boolean; error?: string }> {
+  try {
+    console.log('[TradingDashboardPage] Pre-estimating gas for approval...', {
+      tokenAddress,
+      spenderAddress,
+      amount: amount.toString(),
+    });
+
+    const gasEstimate = await provider.estimateGas({
+      from: await signer.getAddress(),
+      to: tokenAddress,
+      data: encodeERC20Approve(spenderAddress, amount),
+      value: 0n,
+    });
+
+    console.log('[TradingDashboardPage] Gas estimate successful:', gasEstimate.toString());
+    return { gasEstimate, success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.warn('[TradingDashboardPage] Gas estimation failed:', errorMsg);
+    return { gasEstimate: 100000n, success: false, error: errorMsg };
+  }
+}
+
+function extractRpcErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object') {
+    return 'Unknown RPC error';
+  }
+
+  const candidate = error as {
+    shortMessage?: string;
+    reason?: string;
+    message?: string;
+    error?: { message?: string; reason?: string };
+    info?: { error?: { message?: string } };
+  };
+
+  return (
+    candidate.shortMessage
+    || candidate.reason
+    || candidate.error?.reason
+    || candidate.error?.message
+    || candidate.info?.error?.message
+    || candidate.message
+    || 'Unknown RPC error'
+  );
+}
+
+function validateTradeAmountInput(amount: number): void {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Enter a valid positive trade amount.');
+  }
+  if (amount < 1e-8) {
+    throw new Error('Trade amount is too small. Use decimal token units (for example, 0.01), not wei integers.');
+  }
+  if (amount > 1e9) {
+    throw new Error('Trade amount is too large for a safe manual swap. Check token decimals/units and try again.');
+  }
+}
+
+function isValidCalldataHex(data: string): boolean {
+  if (!/^0x[0-9a-fA-F]+$/.test(data)) return false;
+  if ((data.length - 2) % 2 !== 0) return false;
+  return data.length >= 10;
+}
+
+function parseWeiValue(value: unknown): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0) {
+    return BigInt(value);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    if (/^0x[0-9a-fA-F]+$/.test(trimmed)) return BigInt(trimmed);
+    return BigInt(trimmed);
+  }
+  if (value === undefined || value === null || value === '') return 0n;
+  throw new Error('Swap builder returned invalid value field; expected wei as decimal/hex integer string.');
+}
+
 const TradingDashboardPage: React.FC = () => {
   const { appendLog } = useBondCredit();
   const [tradeTab, setTradeTab] = useState<TradeTab>('buy');
@@ -277,9 +427,8 @@ const TradingDashboardPage: React.FC = () => {
   const [tradeAmount, setTradeAmount] = useState('');
   const [chartPeriod, setChartPeriod] = useState<'1W' | '1M' | '3M' | '1Y'>('1M');
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
-  const [networkLabel, setNetworkLabel] = useState('XLayer Testnet');
+  const [networkLabel, setNetworkLabel] = useState('XLayer Mainnet');
   const [tradablePairs, setTradablePairs] = useState<TradablePair[]>([]);
-  const [executionMode, setExecutionMode] = useState<'simulated' | 'uniswap-v2'>('simulated');
   const [loadingPairs, setLoadingPairs] = useState(false);
   const [tradeError, setTradeError] = useState('');
   const [tradeStatus, setTradeStatus] = useState('');
@@ -341,11 +490,6 @@ const TradingDashboardPage: React.FC = () => {
 
       const pairs = Array.isArray(payload?.tradablePairs) ? payload.tradablePairs as TradablePair[] : [];
       setTradablePairs(pairs);
-      if (payload?.executionMode === 'uniswap-v2') {
-        setExecutionMode('uniswap-v2');
-      } else {
-        setExecutionMode('simulated');
-      }
       if (typeof payload?.network === 'string') {
         setNetworkLabel(payload.network === 'xlayer-mainnet' ? 'XLayer Mainnet' : 'XLayer Testnet');
       }
@@ -449,86 +593,188 @@ const TradingDashboardPage: React.FC = () => {
     void loadWalletTradeSnapshot(connectedWallet);
   }, [connectedWallet]);
 
-  const executeSimulatedTrade = async (input: {
-    signerAddress: string;
-    amount: number;
-    selectedPairMeta: TradablePair;
-  }) => {
-    setTradeStatus('Submitting simulated trade...');
-    const executeResponse = await fetch(`${API_BASE_URL}/trade/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        walletAddress: input.signerAddress,
-        pair: selectedPair,
-        side: toTradeSide(tradeTab),
-        amount: input.amount,
-        tokenIn: input.selectedPairMeta.tokenIn.address,
-        tokenOut: input.selectedPairMeta.tokenOut.address,
-      }),
-    });
-
-    const executePayload = await executeResponse.json().catch(() => null);
-    if (!executeResponse.ok) {
-      throw new Error(
-        typeof executePayload?.error === 'string'
-          ? executePayload.error
-          : `Could not execute simulated trade (${executeResponse.status})`,
-      );
-    }
-
-    setTradeStatus(`Simulated trade recorded. Status: ${executePayload?.trade?.status ?? 'SUCCESS'}`);
-    appendLog(`trade.simulated.execute(): ${JSON.stringify(executePayload, null, 2)}`);
-    await loadWalletTradeSnapshot(input.signerAddress);
-    setTradeAmount('');
-  };
-
   const executeUserSignedTrade = async (input: {
     signer: Awaited<ReturnType<BrowserProvider['getSigner']>>;
     signerAddress: string;
     amount: number;
     selectedPairMeta: TradablePair;
   }) => {
+    const provider = input.signer.provider;
+    if (!provider || !(provider instanceof BrowserProvider)) {
+      throw new Error('Unable to access wallet provider for trade validation.');
+    }
+    await validateManualTradePreflight(provider, input.selectedPairMeta.tokenIn.address);
+
     const tokenInContract = new Contract(input.selectedPairMeta.tokenIn.address, ERC20_ABI, input.signer);
-    const router = new Contract(ROUTER_ADDRESS, UNISWAP_V2_ROUTER_ABI, input.signer);
 
     const tokenDecimals = Number(await tokenInContract.decimals());
     const amountIn = parseUnits(String(input.amount), tokenDecimals);
-    const path = [input.selectedPairMeta.tokenIn.address, input.selectedPairMeta.tokenOut.address];
 
     setTradeStatus('Fetching swap quote...');
-    const quoted = (await router.getAmountsOut(amountIn, path)) as bigint[];
-    const estimatedAmountOut = quoted.at(-1) ?? 0n;
-    const amountOutMin = (estimatedAmountOut * 9950n) / 10000n;
-
-    setTradeStatus('Checking token allowance...');
-    const allowance = (await tokenInContract.allowance(input.signerAddress, ROUTER_ADDRESS)) as bigint;
-    if (allowance < amountIn) {
-      const approveTx = await tokenInContract.approve(ROUTER_ADDRESS, amountIn);
-      setTradeStatus('Waiting for token approval confirmation...');
-      await approveTx.wait();
+    const quoteResponse = await fetch(
+      `${API_BASE_URL}/quote?tokenIn=${encodeURIComponent(input.selectedPairMeta.tokenIn.address)}&tokenOut=${encodeURIComponent(input.selectedPairMeta.tokenOut.address)}&amount=${encodeURIComponent(String(input.amount))}&userAddress=${encodeURIComponent(input.signerAddress)}`,
+      { method: 'GET' },
+    );
+    const quotePayload = await quoteResponse.json().catch(() => null);
+    if (!quoteResponse.ok) {
+      throw new Error(
+        typeof quotePayload?.error === 'string'
+          ? quotePayload.error
+          : `Could not fetch quote (${quoteResponse.status})`,
+      );
     }
 
-    const deadline = Math.floor(Date.now() / 1000) + 10 * 60;
-    setTradeStatus('Awaiting wallet signature for swap...');
-    const swapTx = await router.swapExactTokensForTokens(
-      amountIn,
-      amountOutMin,
-      path,
-      input.signerAddress,
-      deadline,
+    setTradeStatus('Building swap transaction...');
+    const buildResponse = await fetch(
+      `${API_BASE_URL}/build-tx?tokenIn=${encodeURIComponent(input.selectedPairMeta.tokenIn.address)}&tokenOut=${encodeURIComponent(input.selectedPairMeta.tokenOut.address)}&amount=${encodeURIComponent(String(input.amount))}&userAddress=${encodeURIComponent(input.signerAddress)}`,
+      { method: 'GET' },
     );
+    const buildPayload = await buildResponse.json().catch(() => null);
+    if (!buildResponse.ok) {
+      throw new Error(
+        typeof buildPayload?.error === 'string'
+          ? buildPayload.error
+          : `Could not build swap transaction (${buildResponse.status})`,
+      );
+    }
+    if (!isAddress(String(buildPayload?.to ?? ''))) {
+      throw new Error('Swap builder returned invalid destination address.');
+    }
+    if (!isValidCalldataHex(String(buildPayload?.data ?? ''))) {
+      throw new Error('Swap builder returned invalid calldata (missing/invalid function selector).');
+    }
+
+    const buildDiagnostics = typeof buildPayload?.diagnostics === 'object' && buildPayload.diagnostics !== null
+      ? buildPayload.diagnostics as Record<string, unknown>
+      : null;
+    if (buildDiagnostics?.hasToAddress === false || buildDiagnostics?.hasDataPayload === false) {
+      throw new Error('Swap builder diagnostics flagged non-executable payload. Retry with another pair/amount.');
+    }
+
+    setTradeStatus('Checking token allowance...');
+    const spender = String(buildPayload.to);
+
+    // === APPROVAL DIAGNOSTICS ===
+    console.group('[TradingDashboardPage] Approval Transaction Diagnostics');
+    console.log('Token Contract:', input.selectedPairMeta.tokenIn.address);
+    console.log('Spender (Router):', spender);
+    console.log('Signer Address:', input.signerAddress);
+    console.log('Amount (Wei):', amountIn.toString());
+    const networkDash = await provider.getNetwork();
+    console.log('Chain ID:', networkDash.chainId);
+
+    // Validate router contract exists
+    const routerValidation = await validateRouterContract(provider, spender);
+    console.log('Router Validation:', routerValidation);
+    if (!routerValidation.valid) {
+      throw new Error(`Router validation failed: ${routerValidation.message}`);
+    }
+    console.groupEnd();
+    // === END DIAGNOSTICS ===
+
+    const allowance = (await tokenInContract.allowance(input.signerAddress, spender)) as bigint;
+    console.log('[TradingDashboardPage] Current allowance:', allowance.toString());
+
+    if (allowance < amountIn) {
+      setTradeStatus('Pre-validating approval transaction...');
+
+      // Pre-estimate gas to catch simulation errors early
+      const gasResult = await preEstimateApprovalGas(
+        provider,
+        input.selectedPairMeta.tokenIn.address,
+        spender,
+        amountIn,
+        input.signer,
+      );
+
+      if (!gasResult.success) {
+        console.error('[TradingDashboardPage] Gas pre-estimation failed:', gasResult.error);
+        throw new Error(`Approval failed pre-validation: ${gasResult.error}`);
+      }
+
+      setTradeStatus('Waiting for token approval confirmation...');
+      console.log('[TradingDashboardPage] Sending approval transaction via ethers.js Contract.approve()...');
+
+      try {
+        const approveTx = await tokenInContract.approve(spender, amountIn);
+        console.log('[TradingDashboardPage] Approval tx sent:', approveTx.hash);
+        await approveTx.wait();
+        console.log('[TradingDashboardPage] Approval confirmed');
+      } catch (approveError) {
+        const errorMsg = approveError instanceof Error ? approveError.message : 'Unknown error';
+        console.error('[TradingDashboardPage] Contract.approve() failed:', errorMsg);
+
+        // Fallback: Try manual approval encoding
+        console.warn('[TradingDashboardPage] Attempting manual approval encoding fallback...');
+        try {
+          const manualApproveData = encodeERC20Approve(spender, amountIn);
+          console.log('[TradingDashboardPage] Manual encoded approve data:', manualApproveData);
+
+          const manualApproveTx = await input.signer.sendTransaction({
+            to: input.selectedPairMeta.tokenIn.address,
+            data: manualApproveData,
+            value: 0n,
+          });
+
+          console.log('[TradingDashboardPage] Manual approval tx sent:', manualApproveTx.hash);
+          await manualApproveTx.wait();
+          console.log('[TradingDashboardPage] Manual approval confirmed');
+        } catch (manualError) {
+          const manualErrorMsg = manualError instanceof Error ? manualError.message : 'Unknown error';
+          console.error('[TradingDashboardPage] Manual approval fallback also failed:', manualErrorMsg);
+          throw new Error(`Approval failed: ${errorMsg}. Manual fallback also failed: ${manualErrorMsg}`);
+        }
+      }
+    }
+
+    const swapRequest = {
+      to: buildPayload?.to,
+      data: buildPayload?.data,
+      value: parseWeiValue(buildPayload?.value),
+      gasLimit: buildPayload?.gasLimit ? BigInt(buildPayload.gasLimit) : undefined,
+      gasPrice: buildPayload?.gasPrice ? BigInt(buildPayload.gasPrice) : undefined,
+      maxFeePerGas: buildPayload?.maxFeePerGas ? BigInt(buildPayload.maxFeePerGas) : undefined,
+      maxPriorityFeePerGas: buildPayload?.maxPriorityFeePerGas ? BigInt(buildPayload.maxPriorityFeePerGas) : undefined,
+    };
+
+    console.group('[TradingDashboardPage] Swap Preflight Diagnostics');
+    console.log('Build Diagnostics:', buildDiagnostics);
+    console.log('Swap To:', swapRequest.to);
+    console.log('Swap Data Length:', swapRequest.data?.length ?? 0);
+    console.log('Swap Value (wei):', swapRequest.value.toString());
+    console.log('Chain ID:', (await provider.getNetwork()).chainId.toString());
+    console.groupEnd();
+
+    setTradeStatus('Validating swap transaction...');
+    try {
+      await provider.estimateGas({
+        ...swapRequest,
+        from: input.signerAddress,
+      });
+    } catch (swapPreflightError) {
+      const reason = extractRpcErrorMessage(swapPreflightError);
+      const extraHint = reason.toLowerCase().includes('missing revert data')
+        ? ' Confirm router deployment on current chain, allowance >= amountIn, wallet token balance, and build diagnostics.hasDataPayload.'
+        : '';
+      throw new Error(
+        `Swap simulation failed before wallet signature: ${reason}. Verify token balance, allowance, and route availability for this pair.${extraHint}`,
+      );
+    }
+
+    setTradeStatus('Awaiting wallet signature for swap...');
+    const swapTx = await input.signer.sendTransaction(swapRequest);
 
     setTradeStatus('Swap transaction pending...');
     const receipt = await swapTx.wait();
     const txStatus = receipt?.status === 1 ? 'SUCCESS' : 'FAILED';
     const txHash = receipt?.hash ?? swapTx.hash;
 
-    const recordResponse = await fetch(`${API_BASE_URL}/trade/record`, {
+    const recordResponse = await fetch(`${API_BASE_URL}/store-transaction`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         walletAddress: input.signerAddress,
+        userId: input.signerAddress,
         pair: selectedPair,
         side: toTradeSide(tradeTab),
         amount: input.amount,
@@ -538,8 +784,11 @@ const TradingDashboardPage: React.FC = () => {
           tokenIn: input.selectedPairMeta.tokenIn.address,
           tokenOut: input.selectedPairMeta.tokenOut.address,
           amountInWei: amountIn.toString(),
-          amountOutMinWei: amountOutMin.toString(),
-          estimatedAmountOutWei: estimatedAmountOut.toString(),
+          expectedToAddress: buildPayload?.to,
+          expectedValueWei: buildPayload?.value ?? '0',
+          expectedData: buildPayload?.data,
+          quote: quotePayload,
+          builtTx: buildPayload,
           manualUserSigned: true,
         },
       }),
@@ -565,8 +814,10 @@ const TradingDashboardPage: React.FC = () => {
     setTradeStatus('');
 
     const amount = Number(tradeAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setTradeError('Enter a valid positive trade amount.');
+    try {
+      validateTradeAmountInput(amount);
+    } catch (amountError) {
+      setTradeError(amountError instanceof Error ? amountError.message : 'Invalid trade amount.');
       return;
     }
 
@@ -579,10 +830,6 @@ const TradingDashboardPage: React.FC = () => {
       setTradeError('Token address metadata is invalid for selected pair.');
       return;
     }
-    if (!isAddress(ROUTER_ADDRESS)) {
-      setTradeError('VITE_BONDCREDIT_UNISWAP_V2_ROUTER is missing or invalid.');
-      return;
-    }
 
     setIsExecutingTrade(true);
     try {
@@ -593,18 +840,12 @@ const TradingDashboardPage: React.FC = () => {
 
       setTradeStatus('Connecting wallet...');
       await injected.request({ method: 'eth_requestAccounts' });
-      const provider = new BrowserProvider(injected);
-      await ensureWalletOnExpectedChain(provider, injected);
+      const provider = await createProviderAfterChainSync(injected);
 
       const signer = await provider.getSigner();
       const signerAddress = await signer.getAddress();
 
       setConnectedWallet(signerAddress);
-
-      if (executionMode === 'simulated') {
-        await executeSimulatedTrade({ signerAddress, amount, selectedPairMeta });
-        return;
-      }
 
       await executeUserSignedTrade({
         signer,
@@ -720,11 +961,6 @@ const TradingDashboardPage: React.FC = () => {
                   {liveScore ? 'Live score' : 'Waiting for wallet'}
                 </div>
               </div>
-              {executionMode === 'simulated' && (
-                <div className="dash-trade__hint" style={{ marginBottom: '10px', color: '#ffb066' }}>
-                  Simulator mode active: trades update history and score without on-chain spend.
-                </div>
-              )}
               {connectedWallet && isSnapshotLoading && (
                 <div className="dash-trade__hint" style={{ marginBottom: '10px' }}>
                   Loading credit score from trade history...

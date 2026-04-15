@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response, Router } from 'express';
-import { formatEther, isAddress, isHexString, keccak256, parseEther, toUtf8Bytes } from 'ethers';
+import { Interface, formatEther, isAddress, isHexString, keccak256, parseEther, toUtf8Bytes } from 'ethers';
 import type { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '../client.js';
@@ -7,9 +7,13 @@ import { getDbClient } from '../db/client.js';
 import {
   getGuarantorReadContract,
   getGuarantorWriteContract,
+  getSubscriptionReadContract,
   hasGuarantorContract,
   hasSubscriptionContract,
+  subscriptionManagerAbi,
 } from '../../src/lib/onchain.js';
+import { submitOkxManagedSubscriptionTx } from '../services/okxSubscriptionService.js';
+import { verifySubscriptionTransaction } from '../services/subscriptionTxVerification.js';
 
 const router = Router();
 
@@ -916,6 +920,106 @@ router.post('/credit/settle', async (req: Request, res: Response, next: NextFunc
   } catch (error) {
     const message = decodeGuarantorErrorMessage(error);
     res.status(400).json({ settled: false, reason: message });
+  }
+});
+
+router.post('/agent/subscribe', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { agentId } = req.body as { agentId?: string };
+    if (!agentId || typeof agentId !== 'string' || !isAddress(agentId.trim())) {
+      res.status(400).json({ error: 'agentId is required and must be a valid EVM address' });
+      return;
+    }
+
+    const normalizedAgentId = agentId.trim();
+    const db = getDbClient();
+    const agent = await db.agent.findFirst({
+      where: {
+        walletAddress: {
+          equals: normalizedAgentId,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        walletAddress: true,
+      },
+    });
+
+    if (!agent) {
+      res.status(404).json({ error: 'Agent not found for provided wallet address' });
+      return;
+    }
+
+    const client = createClient(agent.walletAddress);
+    if (!hasSubscriptionContract(client.config)) {
+      res.status(500).json({ error: 'On-chain subscription contract must be configured' });
+      return;
+    }
+
+    const subscriptionManagerAddress = client.config.contracts?.subscriptionManager;
+    if (!client.config.rpcUrl || !subscriptionManagerAddress) {
+      res.status(500).json({ error: 'rpcUrl and subscription manager contract must be configured' });
+      return;
+    }
+
+    const chainIdRaw = process.env.BONDCREDIT_CHAIN_ID ?? process.env.VITE_BONDCREDIT_CHAIN_ID ?? '195';
+    const chainId = Number(chainIdRaw);
+    if (!Number.isFinite(chainId) || chainId < 1) {
+      res.status(500).json({ error: 'BONDCREDIT_CHAIN_ID must be a valid positive integer' });
+      return;
+    }
+
+    const defaultDays = Number(process.env.BONDCREDIT_DEFAULT_SUBSCRIPTION_DAYS ?? 30);
+    const daysToBuy = Math.max(1, Math.trunc(Number.isFinite(defaultDays) ? defaultDays : 30));
+
+    const subscriptionRead = getSubscriptionReadContract(client.config);
+    if (!subscriptionRead) {
+      res.status(500).json({ error: 'Unable to initialize subscription read contract' });
+      return;
+    }
+
+    const pricePerDayWei = (await subscriptionRead.pricePerDayWei()) as bigint;
+    const totalValueWei = pricePerDayWei * BigInt(daysToBuy);
+
+    const iface = new Interface(subscriptionManagerAbi);
+    const calldata = iface.encodeFunctionData('subscribe', [daysToBuy]);
+
+    const txHash = await submitOkxManagedSubscriptionTx({
+      agentWalletAddress: agent.walletAddress,
+      contractAddress: subscriptionManagerAddress,
+      chainId,
+      data: calldata,
+      valueWei: totalValueWei,
+    });
+
+    await verifySubscriptionTransaction({
+      rpcUrl: client.config.rpcUrl,
+      txHash,
+      expectedContractAddress: subscriptionManagerAddress,
+      expectedFromAddress: agent.walletAddress,
+      expectedValueWei: totalValueWei,
+      expectedDaysToBuy: daysToBuy,
+    });
+
+    const updatedAgent = await db.agent.update({
+      where: { id: agent.id },
+      data: {
+        subscriptionStatus: 'ACTIVE',
+        subscriptionTxHash: txHash,
+      },
+      select: {
+        walletAddress: true,
+      },
+    });
+
+    res.json({
+      status: 'SUCCESS',
+      txHash,
+      agentId: updatedAgent.walletAddress,
+    });
+  } catch (error) {
+    next(error);
   }
 });
 

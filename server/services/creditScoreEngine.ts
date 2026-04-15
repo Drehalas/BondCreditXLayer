@@ -3,7 +3,8 @@ import { CreditUnlockType, Prisma, PrismaClient, TradeExecutionStatus } from '@p
 export interface ApplyTradeScoreInput {
   agentId: number;
   tradeExecutionId: number;
-  status: TradeExecutionStatus;
+  status?: TradeExecutionStatus;
+  isProfit?: boolean;
   reason?: string;
 }
 
@@ -47,7 +48,10 @@ export async function applyTradeScoreAndUnlocksTx(
     throw new Error('Agent not found for score update');
   }
 
-  const delta = input.status === TradeExecutionStatus.SUCCESS ? 1 : -1;
+  const isProfit = typeof input.isProfit === 'boolean'
+    ? input.isProfit
+    : input.status === TradeExecutionStatus.SUCCESS;
+  const delta = isProfit ? 1 : -1;
   const scoreBefore = agent.creditScore;
   const scoreAfter = scoreBefore + delta;
 
@@ -84,9 +88,7 @@ export async function applyTradeScoreAndUnlocksTx(
       delta,
       reason:
         input.reason ??
-        (input.status === TradeExecutionStatus.SUCCESS
-          ? 'Trade succeeded'
-          : 'Trade failed'),
+        (isProfit ? 'Trade profitable' : 'Trade not profitable'),
       scoreBefore,
       scoreAfter: updated.creditScore,
       successfulTradesAfter: updated.successfulTrades,

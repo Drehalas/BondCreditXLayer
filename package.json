@@ -29,7 +29,10 @@
     "contract:clean": "hardhat clean",
     "contract:compile": "hardhat compile",
     "contract:test": "hardhat test",
-    "contract:deploy:testnet": "hardhat run scripts/deploy.cjs --network xlayerTestnet"
+    "contract:deploy:testnet": "hardhat run scripts/deploy.cjs --network xlayerTestnet",
+    "contract:preflight:mainnet": "node scripts/preflight-mainnet.cjs",
+    "contract:deploy:mainnet:raw": "hardhat run scripts/deploy.cjs --network xlayerMainnet",
+    "contract:deploy:mainnet": "npm run contract:preflight:mainnet && npm run contract:deploy:mainnet:raw"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

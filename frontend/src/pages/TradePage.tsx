@@ -1,709 +1,1015 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  Terminal,
-  Zap,
-  ShieldCheck,
-  Activity,
-  ArrowUpRight,
-  ArrowDownRight,
-  RefreshCw,
-  Wallet,
-  Trophy,
-  Lock,
-  Unlock,
-  CheckCircle2,
-  XCircle,
-  TrendingUp,
-  TrendingDown,
-  ArrowRightLeft,
-  Fingerprint,
-  Scale,
-  Shield,
-  Key,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AbiCoder, BrowserProvider, Contract, isAddress, parseUnits } from 'ethers';
 
-/* ═══════════════════════════════════════════════════════════════
-   TYPES
-   ═══════════════════════════════════════════════════════════════ */
-interface TradeRecord {
-  id: number;
-  pair: string;
-  side: 'Buy' | 'Sell';
-  amount: string;
-  price: string;
-  pnl: string;
-  pnlValue: number;
-  creditImpact: number;
-  status: 'Success' | 'Failed';
-  time: string;
-  txHash: string;
+const API_BASE_URL = import.meta.env.VITE_BONDCREDIT_API_BASE_URL ?? 'http://localhost:3000';
+const EXPECTED_CHAIN_ID = BigInt(import.meta.env.VITE_BONDCREDIT_CHAIN_ID ?? '196');
+
+type ExecutionMode = 'manual' | 'agent';
+type TradeSide = 'BUY' | 'SELL' | 'LONG' | 'SHORT' | 'DEPOSIT';
+type HistoryScope = 'wallet' | 'agent';
+type StatusFilter = 'ALL' | 'SUCCESS' | 'FAILED';
+
+interface Eip1193Provider {
+  request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
+  on?(event: string, listener: (...args: unknown[]) => void): void;
+  removeListener?(event: string, listener: (...args: unknown[]) => void): void;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   CONSTANTS
-   ═══════════════════════════════════════════════════════════════ */
-const ACTIVATION_STEPS = [
-  { text: 'x402 payment complete...', icon: '💳', delay: 900 },
-  { text: 'Wallet analysis loading...', icon: '🔍', delay: 1100 },
-  { text: 'KYC/KYB review pending...', icon: '📋', delay: 1400 },
-  { text: 'KYAgent unlocked...', icon: '🤖', delay: 800 },
-  { text: 'Ethos account not identified', icon: '⚠️', delay: 700 },
-  { text: 'AMLBOT review completed', icon: '✅', delay: 1200 },
-  { text: 'Scoring Algorithm unlocked', icon: '📊', delay: 900 },
-  { text: "It's time to Bond", icon: '🚀', delay: 600 },
-];
+interface TradeToken {
+  symbol: string;
+  address: string;
+  decimals: number;
+}
 
-const TRADE_PAIRS = [
-  { label: 'ETH / USDC', from: 'ETH', to: 'USDC', basePrice: 3685.42 },
-  { label: 'XLYR / USDT', from: 'XLYR', to: 'USDT', basePrice: 1.24 },
-  { label: 'WETH / WBTC', from: 'WETH', to: 'WBTC', basePrice: 0.054 },
-];
+interface TradablePair {
+  pair: string;
+  tokenIn: TradeToken;
+  tokenOut: TradeToken;
+}
 
-const REWARD_THRESHOLD = 10;
-const CREDIT_LINE_AMOUNT = 100;
+interface TradeHistoryItem {
+  id: number;
+  pair: string;
+  side: string;
+  amount: number;
+  status: string;
+  txHash?: string | null;
+  pnlDelta?: number | null;
+  errorMessage?: string | null;
+  executedAt: string;
+}
 
-const randomTxHash = () =>
-  '0x' + Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('') + '...';
+interface ScorePayload {
+  score: number;
+  successfulTrades: number;
+  failedTrades: number;
+}
 
-const formatTime = () => new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const ERC20_ABI = [
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+] as const;
 
-/* ═══════════════════════════════════════════════════════════════
-   COMPONENT
-   ═══════════════════════════════════════════════════════════════ */
+function sideLabel(side: string): string {
+  const normalized = side.trim().toUpperCase();
+  if (normalized === 'BUY') return 'Buy';
+  if (normalized === 'SELL') return 'Sell';
+  if (normalized === 'LONG') return 'Long';
+  if (normalized === 'SHORT') return 'Short';
+  if (normalized === 'DEPOSIT') return 'Deposit';
+  return side;
+}
+
+function formatRelativeTime(iso: string): string {
+  const deltaSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
+  if (deltaSeconds < 60) return `${deltaSeconds}s ago`;
+  if (deltaSeconds < 3600) return `${Math.floor(deltaSeconds / 60)}m ago`;
+  if (deltaSeconds < 86400) return `${Math.floor(deltaSeconds / 3600)}h ago`;
+  return `${Math.floor(deltaSeconds / 86400)}d ago`;
+}
+
+async function ensureWalletOnExpectedChain(provider: BrowserProvider, injected: Eip1193Provider): Promise<void> {
+  const current = await provider.getNetwork();
+  if (current.chainId === EXPECTED_CHAIN_ID) return;
+  await injected.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: `0x${EXPECTED_CHAIN_ID.toString(16)}` }] });
+}
+
+async function createProviderAfterChainSync(injected: Eip1193Provider): Promise<BrowserProvider> {
+  const initialProvider = new BrowserProvider(injected);
+  await ensureWalletOnExpectedChain(initialProvider, injected);
+  // Recreate provider after potential chain change event to avoid stale-network errors.
+  await injected.request({ method: 'eth_chainId' });
+  return new BrowserProvider(injected);
+}
+
+async function validateManualTradePreflight(provider: BrowserProvider, tokenAddress: string): Promise<void> {
+  const network = await provider.getNetwork();
+  if (network.chainId !== EXPECTED_CHAIN_ID) {
+    throw new Error(
+      `Wrong network connected. Expected chain ${EXPECTED_CHAIN_ID.toString()}, got ${network.chainId.toString()}. Switch network and retry.`,
+    );
+  }
+
+  const code = await provider.getCode(tokenAddress);
+  if (!code || code === '0x') {
+    throw new Error(
+      `Token contract ${tokenAddress} is not deployed on chain ${network.chainId.toString()}. Check network and selected token pair.`,
+    );
+  }
+}
+
+/**
+ * Validate that router contract is deployed at the given address
+ */
+async function validateRouterContract(
+  provider: BrowserProvider,
+  routerAddress: string,
+): Promise<{ valid: boolean; message?: string }> {
+  if (!isAddress(routerAddress)) {
+    return { valid: false, message: `Invalid router address format: ${routerAddress}` };
+  }
+
+  const code = await provider.getCode(routerAddress);
+  if (!code || code === '0x') {
+    return {
+      valid: false,
+      message: `Router contract not deployed at ${routerAddress}. Check spender address from /build-tx response.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Encode ERC20 approve() function call for manual transaction building
+ */
+function encodeERC20Approve(spenderAddress: string, amount: bigint): string {
+  try {
+    // ERC20 approve(address spender, uint256 amount)
+    const encoded = AbiCoder.defaultAbiCoder().encode(
+      ['address', 'uint256'],
+      [spenderAddress, amount],
+    );
+    // Function selector for approve(address,uint256) = 0x095ea7b3
+    return '0x095ea7b3' + encoded.slice(2);
+  } catch (error) {
+    throw new Error(`Failed to encode approve() call: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Pre-estimate gas for approval transaction before sending to MetaMask
+ */
+async function preEstimateApprovalGas(
+  provider: BrowserProvider,
+  tokenAddress: string,
+  spenderAddress: string,
+  amount: bigint,
+  signer: Awaited<ReturnType<BrowserProvider['getSigner']>>,
+): Promise<{ gasEstimate: bigint; success: boolean; error?: string }> {
+  try {
+    console.log('[TradePage] Pre-estimating gas for approval...', {
+      tokenAddress,
+      spenderAddress,
+      amount: amount.toString(),
+    });
+
+    const gasEstimate = await provider.estimateGas({
+      from: await signer.getAddress(),
+      to: tokenAddress,
+      data: encodeERC20Approve(spenderAddress, amount),
+      value: 0n,
+    });
+
+    console.log('[TradePage] Gas estimate successful:', gasEstimate.toString());
+    return { gasEstimate, success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.warn('[TradePage] Gas estimation failed:', errorMsg);
+    return { gasEstimate: 100000n, success: false, error: errorMsg };
+  }
+}
+
+function extractRpcErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object') {
+    return 'Unknown RPC error';
+  }
+
+  const candidate = error as {
+    shortMessage?: string;
+    reason?: string;
+    message?: string;
+    error?: { message?: string; reason?: string };
+    info?: { error?: { message?: string } };
+  };
+
+  return (
+    candidate.shortMessage
+    || candidate.reason
+    || candidate.error?.reason
+    || candidate.error?.message
+    || candidate.info?.error?.message
+    || candidate.message
+    || 'Unknown RPC error'
+  );
+}
+
+function validateTradeAmountInput(amount: number): void {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Trade amount must be a positive number.');
+  }
+  if (amount < 1e-8) {
+    throw new Error('Trade amount is too small. Use decimal token units (e.g. 0.01), not wei integers.');
+  }
+  if (amount > 1e9) {
+    throw new Error('Trade amount is too large for a safe manual swap. Check token decimals/units and try again.');
+  }
+}
+
+function isValidCalldataHex(data: string): boolean {
+  if (!/^0x[0-9a-fA-F]+$/.test(data)) return false;
+  if ((data.length - 2) % 2 !== 0) return false;
+  return data.length >= 10;
+}
+
+function parseWeiValue(value: unknown): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0) {
+    return BigInt(value);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    if (/^0x[0-9a-fA-F]+$/.test(trimmed)) return BigInt(trimmed);
+    return BigInt(trimmed);
+  }
+  if (value === undefined || value === null || value === '') return 0n;
+  throw new Error('Swap builder returned invalid value field; expected wei as decimal/hex integer string.');
+}
+
+function normalizeBuildPayloadTxSource(payload: unknown): { tx: Record<string, unknown> | null; schema: 'nested' | 'flat' } {
+  if (!payload || typeof payload !== 'object') {
+    return { tx: null, schema: 'flat' };
+  }
+
+  const obj = payload as Record<string, unknown>;
+
+  if (Array.isArray(obj.data) && obj.data.length > 0) {
+    const first = obj.data[0];
+    if (first && typeof first === 'object' && 'tx' in first) {
+      const nestedTx = (first as Record<string, unknown>).tx;
+      if (nestedTx && typeof nestedTx === 'object') {
+        console.log('[TradePage] Using nested tx from data[0].tx');
+        return { tx: nestedTx as Record<string, unknown>, schema: 'nested' };
+      }
+    }
+  }
+
+  if ('to' in obj && 'data' in obj) {
+    console.log('[TradePage] Falling back to flat root tx fields');
+    return { tx: obj, schema: 'flat' };
+  }
+
+  return { tx: null, schema: 'flat' };
+}
+
+function decimalOrHexToHex(value: unknown): string {
+  if (value === undefined || value === null || value === '') {
+    return '0x0';
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^0x[0-9a-fA-F]+$/.test(trimmed)) {
+      return trimmed;
+    }
+    const num = Number.parseInt(trimmed, 10);
+    if (!Number.isNaN(num) && num >= 0) {
+      return '0x' + num.toString(16);
+    }
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return '0x' + Math.floor(value).toString(16);
+  }
+
+  if (typeof value === 'bigint' && value >= 0n) {
+    return '0x' + value.toString(16);
+  }
+
+  throw new Error(`Cannot convert value to hex: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`);
+}
+
 const TradePage: React.FC = () => {
-  /* ── State ── */
-  const [logs, setLogs] = useState<Array<{ text: string; type: 'system' | 'trade-ok' | 'trade-fail' | 'info'; time: string }>>([]);
-  const [isIngesting, setIsIngesting] = useState(false);
-  const [isAgentActive, setIsAgentActive] = useState(false);
-  const [creditScore, setCreditScore] = useState(0);
-  const [trades, setTrades] = useState<TradeRecord[]>([]);
-  const [tradeStatus, setTradeStatus] = useState<'idle' | 'trading'>('idle');
-  const [selectedPairIdx, setSelectedPairIdx] = useState(0);
-  const [tradeAmount, setTradeAmount] = useState('0.5');
-  const [rewardUnlocked, setRewardUnlocked] = useState(false);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [walletBalances, setWalletBalances] = useState({ ETH: 12.45, USDC: 4210.80, XLYR: 8500, USDT: 2100, WETH: 5.2, WBTC: 0.28 });
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>('manual');
+  const [historyScope, setHistoryScope] = useState<HistoryScope>('wallet');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const terminalRef = useRef<HTMLDivElement>(null);
-  const tradeIdRef = useRef(0);
+  const [pairs, setPairs] = useState<TradablePair[]>([]);
+  const [pairSearch, setPairSearch] = useState('');
+  const [selectedPair, setSelectedPair] = useState('');
+  const [tradeSide, setTradeSide] = useState<TradeSide>('BUY');
+  const [tradeAmount, setTradeAmount] = useState('1');
 
-  /* ── Helpers ── */
-  const addLog = useCallback((text: string, type: 'system' | 'trade-ok' | 'trade-fail' | 'info' = 'system') => {
-    setLogs(prev => [...prev, { text, type, time: formatTime() }]);
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [agentWallet, setAgentWallet] = useState('');
+
+  const [history, setHistory] = useState<TradeHistoryItem[]>([]);
+  const [totalHistory, setTotalHistory] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [score, setScore] = useState<ScorePayload | null>(null);
+
+  const [loadingPairs, setLoadingPairs] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [submittingManual, setSubmittingManual] = useState(false);
+  const [submittingAgent, setSubmittingAgent] = useState(false);
+
+  const [manualStatus, setManualStatus] = useState('');
+  const [agentStatus, setAgentStatus] = useState('');
+  const [error, setError] = useState('');
+
+  const selectedPairMeta = useMemo(
+    () => pairs.find(item => item.pair === selectedPair) ?? null,
+    [pairs, selectedPair],
+  );
+
+  const filteredPairs = useMemo(() => {
+    if (!pairSearch.trim()) return pairs;
+    const query = pairSearch.trim().toUpperCase();
+    return pairs.filter(item => (
+      item.pair.toUpperCase().includes(query)
+      || item.tokenIn.symbol.toUpperCase().includes(query)
+      || item.tokenOut.symbol.toUpperCase().includes(query)
+    ));
+  }, [pairs, pairSearch]);
+
+  const activeHistoryIdentity = historyScope === 'wallet' ? connectedWallet : agentWallet.trim();
+
+  const loadTokens = async () => {
+    setLoadingPairs(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tokens`);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(typeof payload?.error === 'string' ? payload.error : `Failed to load token pairs (${response.status})`);
+      }
+      const nextPairs = Array.isArray(payload?.tradablePairs) ? payload.tradablePairs as TradablePair[] : [];
+      setPairs(nextPairs);
+      if (nextPairs.length > 0) {
+        setSelectedPair(current => (current && nextPairs.some(item => item.pair === current) ? current : nextPairs[0].pair));
+      }
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : 'Failed to load tradable pairs');
+    } finally {
+      setLoadingPairs(false);
+    }
+  };
+
+  const loadScore = async (walletAddress: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/score/status/wallet/${walletAddress}`);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) return;
+      if (typeof payload?.score === 'number') {
+        setScore({
+          score: payload.score,
+          successfulTrades: Number(payload.successfulTrades ?? 0),
+          failedTrades: Number(payload.failedTrades ?? 0),
+        });
+      }
+    } catch {
+      // Keep score optional; history stays usable.
+    }
+  };
+
+  const loadHistory = async () => {
+    const identity = activeHistoryIdentity;
+    if (!identity || !isAddress(identity)) {
+      setHistory([]);
+      setTotalHistory(0);
+      setTotalPages(1);
+      return;
+    }
+
+    setLoadingHistory(true);
+    setError('');
+    try {
+      const statusSegment = statusFilter === 'ALL' ? '' : `&status=${statusFilter}`;
+      const response = await fetch(
+        `${API_BASE_URL}/trades/history/wallet/${identity}?page=${page}&pageSize=${pageSize}${statusSegment}`,
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(typeof payload?.error === 'string' ? payload.error : `Failed to load trade history (${response.status})`);
+      }
+      setHistory(Array.isArray(payload?.trades) ? payload.trades as TradeHistoryItem[] : []);
+      setTotalHistory(Number(payload?.total ?? 0));
+      setTotalPages(Math.max(1, Number(payload?.totalPages ?? 1)));
+      await loadScore(identity);
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : 'Failed to load trade history');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadTokens();
   }, []);
 
   useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-    }
-  }, [logs]);
+    const injected = (globalThis as typeof globalThis & { ethereum?: Eip1193Provider }).ethereum;
+    if (!injected) return;
 
-  /* ── Check reward unlock ── */
+    const syncWallet = async () => {
+      try {
+        const accounts = await injected.request({ method: 'eth_accounts' });
+        const primary = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
+        setConnectedWallet(primary && isAddress(primary) ? primary : null);
+      } catch {
+        setConnectedWallet(null);
+      }
+    };
+
+    const onAccountsChanged = (accounts: unknown) => {
+      const primary = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
+      setConnectedWallet(primary && isAddress(primary) ? primary : null);
+    };
+
+    void syncWallet();
+    injected.on?.('accountsChanged', onAccountsChanged);
+    return () => {
+      injected.removeListener?.('accountsChanged', onAccountsChanged);
+    };
+  }, []);
+
   useEffect(() => {
-    if (creditScore >= REWARD_THRESHOLD && !rewardUnlocked) {
-      setRewardUnlocked(true);
-      setShowCelebration(true);
-      addLog(`[REWARD] 🏆 $${CREDIT_LINE_AMOUNT} Credit Line UNLOCKED! Score: ${creditScore}`, 'trade-ok');
-      setTimeout(() => setShowCelebration(false), 4000);
-    }
-  }, [creditScore, rewardUnlocked, addLog]);
+    setPage(1);
+  }, [statusFilter, pageSize, historyScope, connectedWallet, agentWallet]);
 
-  /* ── Skill Ingestion ── */
-  const ingestSkills = async () => {
-    if (isIngesting || isAgentActive) return;
-    setIsIngesting(true);
-    setLogs([]);
+  useEffect(() => {
+    void loadHistory();
+  }, [page, pageSize, statusFilter, historyScope, connectedWallet, agentWallet]);
 
-    addLog('> Initializing BondCredit Agent Skill Ingestion...', 'info');
-    await new Promise(r => setTimeout(r, 600));
-
-    for (const step of ACTIVATION_STEPS) {
-      await new Promise(r => setTimeout(r, step.delay + Math.random() * 400));
-      addLog(`${step.icon} ${step.text}`, 'system');
+  const connectWallet = async () => {
+    setError('');
+    const injected = (globalThis as typeof globalThis & { ethereum?: Eip1193Provider }).ethereum;
+    if (!injected) {
+      setError('No injected wallet found. Install MetaMask or another EVM wallet extension.');
+      return;
     }
 
-    await new Promise(r => setTimeout(r, 500));
-    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-    addLog('✅ Agent activated. Onchain OS wallet connected.', 'trade-ok');
-    addLog('🔗 Uniswap V3 Skill integrated.', 'info');
-    addLog('📡 Ready for autonomous trading on X Layer.', 'info');
-
-    setIsAgentActive(true);
-    setIsIngesting(false);
+    try {
+      const accounts = await injected.request({ method: 'eth_requestAccounts' });
+      const primary = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
+      if (!primary || !isAddress(primary)) {
+        throw new Error('Wallet connection returned an invalid address.');
+      }
+      setConnectedWallet(primary);
+      setHistoryScope('wallet');
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : 'Wallet connection failed');
+    }
   };
 
-  /* ── Execute Trade ── */
-  const executeTrade = async () => {
-    if (!isAgentActive || tradeStatus === 'trading') return;
+  const executeManualTrade = async () => {
+    setError('');
+    setManualStatus('');
 
-    const pair = TRADE_PAIRS[selectedPairIdx];
-    const amount = parseFloat(tradeAmount) || 0.5;
-    setTradeStatus('trading');
-
-    addLog(`> Initiating Uniswap V3 swap: ${amount} ${pair.from} → ${pair.to}...`, 'info');
-    await new Promise(r => setTimeout(r, 800));
-
-    addLog('> Fetching liquidity routes via Onchain OS wallet...', 'info');
-    await new Promise(r => setTimeout(r, 1000));
-
-    addLog('> Optimal route identified: Uniswap V3 (0.05% fee)', 'info');
-    await new Promise(r => setTimeout(r, 600));
-
-    addLog('> Transaction signed & broadcasted...', 'info');
-    await new Promise(r => setTimeout(r, 1500));
-
-    // 70% success, 30% fail
-    const isSuccess = Math.random() < 0.7;
-    const priceVariation = 1 + (Math.random() - 0.5) * 0.04; // ±2%
-    const executionPrice = pair.basePrice * priceVariation;
-    const resultAmount = (amount * executionPrice).toFixed(2);
-    const pnlPct = ((priceVariation - 1) * 100).toFixed(2);
-    const pnlValue = parseFloat(((priceVariation - 1) * amount * pair.basePrice).toFixed(2));
-
-    const tradeId = ++tradeIdRef.current;
-
-    if (isSuccess) {
-      addLog(`[SUCCESS] Swap complete. ${amount} ${pair.from} → ${resultAmount} ${pair.to}`, 'trade-ok');
-      addLog(`> Credit Score: +1 (Trade performance validated)`, 'trade-ok');
-      setCreditScore(prev => prev + 1);
-
-      // Update wallet balances
-      setWalletBalances(prev => ({
-        ...prev,
-        [pair.from]: Math.max(0, (prev[pair.from as keyof typeof prev] || 0) - amount),
-        [pair.to]: (prev[pair.to as keyof typeof prev] || 0) + parseFloat(resultAmount),
-      }));
-
-      setTrades(prev => [{
-        id: tradeId,
-        pair: pair.label,
-        side: 'Buy',
-        amount: `${amount} ${pair.from}`,
-        price: `$${executionPrice.toFixed(2)}`,
-        pnl: `+${pnlPct}%`,
-        pnlValue: Math.abs(pnlValue),
-        creditImpact: +1,
-        status: 'Success',
-        time: formatTime(),
-        txHash: randomTxHash(),
-      }, ...prev]);
-    } else {
-      addLog(`[FAILED] Swap reverted. Slippage exceeded on ${pair.from}/${pair.to}`, 'trade-fail');
-      addLog(`> Credit Score: -1 (Trade failure recorded)`, 'trade-fail');
-      setCreditScore(prev => Math.max(0, prev - 1));
-
-      setTrades(prev => [{
-        id: tradeId,
-        pair: pair.label,
-        side: 'Sell',
-        amount: `${amount} ${pair.from}`,
-        price: `$${executionPrice.toFixed(2)}`,
-        pnl: `${pnlPct}%`,
-        pnlValue: -Math.abs(pnlValue),
-        creditImpact: -1,
-        status: 'Failed',
-        time: formatTime(),
-        txHash: randomTxHash(),
-      }, ...prev]);
+    if (!connectedWallet || !isAddress(connectedWallet)) {
+      setError('Connect your wallet before submitting manual trades.');
+      return;
+    }
+    if (!selectedPairMeta) {
+      setError('Select a tradable pair before submitting.');
+      return;
+    }
+    const amountNumber = Number(tradeAmount);
+    try {
+      validateTradeAmountInput(amountNumber);
+    } catch (amountError) {
+      setError(amountError instanceof Error ? amountError.message : 'Invalid trade amount.');
+      return;
     }
 
-    setTradeStatus('idle');
+    const injected = (globalThis as typeof globalThis & { ethereum?: Eip1193Provider }).ethereum;
+    if (!injected) {
+      setError('No injected wallet found. Install MetaMask or another EVM wallet extension.');
+      return;
+    }
+
+    setSubmittingManual(true);
+    try {
+      const provider = await createProviderAfterChainSync(injected);
+      const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+      await validateManualTradePreflight(provider, selectedPairMeta.tokenIn.address);
+
+      setManualStatus('Fetching quote...');
+      const quoteResponse = await fetch(
+        `${API_BASE_URL}/quote?tokenIn=${encodeURIComponent(selectedPairMeta.tokenIn.address)}&tokenOut=${encodeURIComponent(selectedPairMeta.tokenOut.address)}&amount=${encodeURIComponent(String(amountNumber))}&userAddress=${encodeURIComponent(signerAddress)}`,
+      );
+      const quotePayload = await quoteResponse.json().catch(() => null);
+      if (!quoteResponse.ok) {
+        throw new Error(typeof quotePayload?.error === 'string' ? quotePayload.error : `Quote failed (${quoteResponse.status})`);
+      }
+
+      setManualStatus('Building transaction...');
+      const buildResponse = await fetch(
+        `${API_BASE_URL}/build-tx?tokenIn=${encodeURIComponent(selectedPairMeta.tokenIn.address)}&tokenOut=${encodeURIComponent(selectedPairMeta.tokenOut.address)}&amount=${encodeURIComponent(String(amountNumber))}&userAddress=${encodeURIComponent(signerAddress)}`,
+      );
+      const buildPayload = await buildResponse.json().catch(() => null);
+      if (!buildResponse.ok) {
+        throw new Error(typeof buildPayload?.error === 'string' ? buildPayload.error : `Build failed (${buildResponse.status})`);
+      }
+      if (!isAddress(String(buildPayload?.to ?? ''))) {
+        throw new Error('Swap builder returned invalid destination address.');
+      }
+      if (!isValidCalldataHex(String(buildPayload?.data ?? ''))) {
+        throw new Error('Swap builder returned invalid calldata (missing/invalid function selector).');
+      }
+
+      const buildDiagnostics = typeof buildPayload?.diagnostics === 'object' && buildPayload.diagnostics !== null
+        ? buildPayload.diagnostics as Record<string, unknown>
+        : null;
+      if (buildDiagnostics?.hasToAddress === false || buildDiagnostics?.hasDataPayload === false) {
+        throw new Error('Swap builder diagnostics flagged non-executable payload. Retry with another pair/amount.');
+      }
+
+      // === NORMALIZE TX SOURCE FIELDS (nested or flat) ===
+      const { tx: txSource, schema: txSchema } = normalizeBuildPayloadTxSource(buildPayload);
+      if (!txSource) {
+        throw new Error(
+          'Swap builder response missing both nested (data[0].tx) and flat (root) tx fields. Verify /build-tx response format.'
+        );
+      }
+      console.log('[TradePage] Tx source schema:', txSchema, 'Fields:', {
+        to: txSource.to,
+        dataLength: typeof txSource.data === 'string' ? txSource.data.length : '?',
+        value: txSource.value,
+        gas: txSource.gas || txSource.gasLimit,
+        gasPrice: txSource.gasPrice,
+      });
+      // === END TX SOURCE NORMALIZATION ===
+
+      const tokenInContract = new Contract(selectedPairMeta.tokenIn.address, ERC20_ABI, signer);
+      const amountIn = parseUnits(String(amountNumber), selectedPairMeta.tokenIn.decimals);
+      const spender = String(txSource.to);
+
+      // === APPROVAL DIAGNOSTICS ===
+      console.group('[TradePage] Approval Transaction Diagnostics');
+      console.log('Token Contract:', selectedPairMeta.tokenIn.address);
+      console.log('Spender (Router):', spender);
+      console.log('Signer Address:', signerAddress);
+      console.log('Amount (Wei):', amountIn.toString());
+      console.log('Chain ID:', (await provider.getNetwork()).chainId);
+
+      // Validate router contract exists
+      const routerValidation = await validateRouterContract(provider, spender);
+      console.log('Router Validation:', routerValidation);
+      if (!routerValidation.valid) {
+        throw new Error(`Router validation failed: ${routerValidation.message}`);
+      }
+      console.groupEnd();
+      // === END DIAGNOSTICS ===
+
+      setManualStatus('Checking allowance...');
+      const allowance = (await tokenInContract.allowance(signerAddress, spender)) as bigint;
+      console.log('[TradePage] Current allowance:', allowance.toString());
+
+      if (allowance < amountIn) {
+        setManualStatus('Pre-validating approval transaction...');
+
+        // Pre-estimate gas to catch simulation errors early
+        const gasResult = await preEstimateApprovalGas(
+          provider,
+          selectedPairMeta.tokenIn.address,
+          spender,
+          amountIn,
+          signer,
+        );
+
+        if (!gasResult.success) {
+          console.error('[TradePage] Gas pre-estimation failed:', gasResult.error);
+          setError(`Approval validation failed: ${gasResult.error}`);
+          throw new Error(`Approval failed pre-validation: ${gasResult.error}`);
+        }
+
+        setManualStatus('Awaiting token approval confirmation...');
+        console.log('[TradePage] Sending approval transaction via ethers.js Contract.approve()...');
+
+        try {
+          const approveTx = await tokenInContract.approve(spender, amountIn);
+          console.log('[TradePage] Approval tx sent:', approveTx.hash);
+          await approveTx.wait();
+          console.log('[TradePage] Approval confirmed');
+        } catch (approveError) {
+          const errorMsg = approveError instanceof Error ? approveError.message : 'Unknown error';
+          console.error('[TradePage] Contract.approve() failed:', errorMsg);
+
+          // Fallback: Try manual approval encoding
+          console.warn('[TradePage] Attempting manual approval encoding fallback...');
+          try {
+            const manualApproveData = encodeERC20Approve(spender, amountIn);
+            console.log('[TradePage] Manual encoded approve data:', manualApproveData);
+
+            const manualApproveTx = await signer.sendTransaction({
+              to: selectedPairMeta.tokenIn.address,
+              data: manualApproveData,
+              value: 0n,
+            });
+
+            console.log('[TradePage] Manual approval tx sent:', manualApproveTx.hash);
+            await manualApproveTx.wait();
+            console.log('[TradePage] Manual approval confirmed');
+          } catch (manualError) {
+            const manualErrorMsg = manualError instanceof Error ? manualError.message : 'Unknown error';
+            console.error('[TradePage] Manual approval fallback also failed:', manualErrorMsg);
+            throw new Error(`Approval failed: ${errorMsg}. Manual fallback also failed: ${manualErrorMsg}`);
+          }
+        }
+      }
+
+      // === BUILD ETH_SENDTRANSACTION PARAMS ===
+      const txTo = typeof txSource.to === 'string' ? txSource.to : String(txSource.to ?? '');
+      const txData = typeof txSource.data === 'string' ? txSource.data : String(txSource.data ?? '');
+      const txValue = txSource.value ?? '0x0';
+      const txGas = txSource.gas ?? txSource.gasLimit;
+      const txGasPrice = txSource.gasPrice;
+
+      if (!isAddress(txTo)) {
+        throw new Error('Normalized tx.to is not a valid address');
+      }
+      if (!isValidCalldataHex(txData)) {
+        throw new Error('Normalized tx.data is not valid hex calldata');
+      }
+
+      // Convert to hex format for wallet RPC
+      const ethSendParams = [
+        {
+          from: signerAddress,
+          to: txTo,
+          data: txData,
+          value: decimalOrHexToHex(txValue),
+          gas: txGas ? decimalOrHexToHex(txGas) : undefined,
+          gasPrice: txGasPrice ? decimalOrHexToHex(txGasPrice) : undefined,
+        } as Record<string, unknown>,
+      ];
+
+      // Clean up undefined fields
+      const cleanParams = ethSendParams[0];
+      if (!cleanParams.gas) delete cleanParams.gas;
+      if (!cleanParams.gasPrice) delete cleanParams.gasPrice;
+
+      console.group('[TradePage] Swap eth_sendTransaction Prepared');
+      console.log('Tx Source Schema:', txSchema);
+      console.log('Final Params:', {
+        from: cleanParams.from,
+        to: cleanParams.to,
+        dataLength: (cleanParams.data as string).length,
+        value: cleanParams.value,
+        gas: cleanParams.gas ?? 'undefined',
+        gasPrice: cleanParams.gasPrice ?? 'undefined',
+      });
+      console.log('Build Diagnostics:', buildDiagnostics);
+      console.log('Chain ID:', (await provider.getNetwork()).chainId.toString());
+      console.groupEnd();
+      // === END ETH_SENDTRANSACTION PREP ===
+
+      setManualStatus('Awaiting wallet signature for swap...');
+      const txHashFromRpc = (await injected.request({
+        method: 'eth_sendTransaction',
+        params: ethSendParams,
+      })) as string;
+
+      if (!txHashFromRpc || typeof txHashFromRpc !== 'string') {
+        throw new Error('eth_sendTransaction did not return a valid transaction hash');
+      }
+
+      console.log('[TradePage] Swap tx hash from RPC:', txHashFromRpc);
+      setManualStatus('Waiting for transaction receipt...');
+      const receipt = await provider.waitForTransaction(txHashFromRpc);
+      const txStatus = receipt?.status === 1 ? 'SUCCESS' : 'FAILED';
+      const txHash = receipt?.hash ?? txHashFromRpc;
+
+      const recordResponse = await fetch(`${API_BASE_URL}/store-transaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: signerAddress,
+          pair: selectedPairMeta.pair,
+          side: tradeSide,
+          amount: amountNumber,
+          txHash,
+          status: txStatus,
+          metadata: {
+            tokenIn: selectedPairMeta.tokenIn.address,
+            tokenOut: selectedPairMeta.tokenOut.address,
+            amountInWei: amountIn.toString(),
+            expectedToAddress: txTo,
+            expectedValueWei: txValue,
+            expectedData: txData,
+            txSchema,
+            normalizedTxFields: {
+              to: txTo,
+              data: txData,
+              value: txValue,
+              gas: txGas,
+              gasPrice: txGasPrice,
+            },
+            quote: quotePayload,
+            builtTx: buildPayload,
+            manualUserSigned: true,
+          },
+        }),
+      });
+
+      const recordPayload = await recordResponse.json().catch(() => null);
+      if (!recordResponse.ok) {
+        throw new Error(typeof recordPayload?.error === 'string' ? recordPayload.error : `Store failed (${recordResponse.status})`);
+      }
+
+      setManualStatus(`Manual trade stored: ${txHash}`);
+      setTradeAmount('');
+      setHistoryScope('wallet');
+      await loadHistory();
+    } catch (tradeError) {
+      setError(tradeError instanceof Error ? tradeError.message : 'Manual trade failed');
+    } finally {
+      setSubmittingManual(false);
+    }
   };
 
-  /* ── Derived ── */
-  const successCount = trades.filter(t => t.status === 'Success').length;
-  const failCount = trades.filter(t => t.status === 'Failed').length;
-  const progressPct = Math.min((creditScore / REWARD_THRESHOLD) * 100, 100);
-  const tradesUntilUnlock = Math.max(0, REWARD_THRESHOLD - creditScore);
+  const executeAgentTrade = async () => {
+    setError('');
+    setAgentStatus('');
 
-  /* ═══════════════════════════════════════════════════════════════
-     RENDER
-     ═══════════════════════════════════════════════════════════════ */
+    const walletAddress = agentWallet.trim();
+    if (!isAddress(walletAddress)) {
+      setError('Agent wallet must be a valid EVM address.');
+      return;
+    }
+    if (!selectedPairMeta) {
+      setError('Select a tradable pair before submitting.');
+      return;
+    }
+    const amountNumber = Number(tradeAmount);
+    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+      setError('Trade amount must be a positive number.');
+      return;
+    }
+
+    setSubmittingAgent(true);
+    try {
+      setAgentStatus('Submitting agent trade...');
+      const response = await fetch(`${API_BASE_URL}/execute-trade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress,
+          pair: selectedPairMeta.pair,
+          tokenIn: selectedPairMeta.tokenIn.address,
+          tokenOut: selectedPairMeta.tokenOut.address,
+          amount: amountNumber,
+          side: tradeSide,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(typeof payload?.error === 'string' ? payload.error : `Agent execution failed (${response.status})`);
+      }
+
+      setAgentStatus(`Agent trade executed: ${payload?.trade?.txHash ?? 'tx submitted'}`);
+      setHistoryScope('agent');
+      await loadHistory();
+    } catch (tradeError) {
+      setError(tradeError instanceof Error ? tradeError.message : 'Agent trade failed');
+    } finally {
+      setSubmittingAgent(false);
+    }
+  };
+
+  const successCount = history.filter(item => item.status === 'SUCCESS').length;
+  const failedCount = history.filter(item => item.status === 'FAILED').length;
+
   return (
     <main className="dash-page" style={{ marginTop: '64px' }}>
-      {/* ── Top Bar ── */}
-      <div className="dash-topbar" style={{ marginBottom: '24px' }}>
+      <div className="dash-topbar">
         <div>
-          <h1 className="dash-topbar__title">
-            Agent Trade <span style={{ color: '#bced62', fontWeight: 400 }}>&amp; Credit Loop</span>
-          </h1>
-          <p className="dash-topbar__sub">Autonomous agent trading on Uniswap via Onchain OS — Credit scoring in real-time</p>
+          <h1 className="dash-topbar__title">Trade</h1>
+          <p className="dash-topbar__sub">Token discovery, manual execution, and agent execution from one tab</p>
         </div>
-        <div className="dash-topbar__right">
-          <div
-            className="dash-topbar__status"
-            style={{
-              color: isAgentActive ? '#3bf7d2' : '#ff4d6d',
-              borderColor: isAgentActive ? 'rgba(59,247,210,0.2)' : 'rgba(255,77,109,0.2)',
-              background: isAgentActive ? 'rgba(59,247,210,0.04)' : 'rgba(255,77,109,0.04)',
-            }}
-          >
-            <div className="dash-topbar__dot" style={{ background: isAgentActive ? '#3bf7d2' : '#ff4d6d' }} />
-            {isAgentActive ? 'AGENT ACTIVE' : isIngesting ? 'INGESTING...' : 'AGENT OFFLINE'}
-          </div>
+        <div className="dash-topbar__right" style={{ gap: '8px' }}>
+          <button className="dash-portfolio__period" onClick={() => void loadTokens()} disabled={loadingPairs}>
+            {loadingPairs ? 'Loading Tokens...' : 'Refresh Tokens'}
+          </button>
+          <button className="dash-portfolio__period" onClick={() => void loadHistory()} disabled={loadingHistory}>
+            {loadingHistory ? 'Loading History...' : 'Refresh History'}
+          </button>
         </div>
       </div>
 
       <div className="dash-layout" style={{ gridTemplateColumns: '1fr 340px' }}>
-        {/* ═══════════════════════════════════════════════
-            LEFT COLUMN
-           ═══════════════════════════════════════════════ */}
         <div className="dash-main">
-
-          {/* ── Panel 1: Agent Terminal ── */}
-          <section
-            className="dash-card"
-            style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}
-          >
-            {/* Terminal Header */}
-            <div className="trade-terminal__header">
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <Terminal size={14} color="#bced62" />
-                <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', color: '#bced62' }}>
-                  BOND_AGENT_CONSOLE_v2.0
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <div className="trade-terminal__dot" style={{ background: '#ff4d6d' }} />
-                <div className="trade-terminal__dot" style={{ background: '#ffb066' }} />
-                <div className="trade-terminal__dot" style={{ background: '#3bf7d2' }} />
-              </div>
+          <section className="dash-card" style={{ marginBottom: '16px' }}>
+            <div className="dash-card__header">
+              <h3 className="dash-card__title">Token Listing</h3>
+              <span className="dash-orders__count">{pairs.length} pairs</span>
             </div>
-
-            {/* Terminal Body */}
-            <div ref={terminalRef} className="trade-terminal__body">
-              {logs.length === 0 && (
-                <div style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
-                  System idle. Ingest agent skills to activate autonomous trading...
-                </div>
-              )}
-              {logs.map((log, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, x: -5 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.15 }}
-                  style={{ marginBottom: '3px' }}
-                >
-                  <span className="trade-terminal__timestamp">[{log.time}]</span>{' '}
-                  <span
-                    className={
-                      log.type === 'trade-ok' ? 'trade-terminal__success' :
-                      log.type === 'trade-fail' ? 'trade-terminal__fail' :
-                      log.type === 'info' ? 'trade-terminal__info' : ''
-                    }
-                  >
-                    {log.text}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
-          </section>
-
-          {/* ── Panel 2: Trade Execution ── */}
-          <div className="trade-exec-row">
-            {/* Swap Form */}
-            <section className="dash-card" style={{ padding: '24px' }}>
-              <div className="dash-card__header" style={{ marginBottom: '12px' }}>
-                <h3 className="dash-card__title">
-                  <ArrowRightLeft size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
-                  Agent Trade Execution
-                </h3>
-                {tradeStatus === 'trading' && <RefreshCw size={14} color="#3bf7d2" className="trade-spin" />}
-              </div>
-
-              <div className="dash-trade__form">
+            <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '12px' }}>
+              <div>
                 <label className="dash-trade__label">
-                  Trade Pair
+                  Search Pair
+                  <input
+                    className="dash-trade__input"
+                    value={pairSearch}
+                    onChange={event => setPairSearch(event.target.value)}
+                    placeholder="ETH, USDC, ETH/USDC"
+                  />
+                </label>
+                <label className="dash-trade__label" style={{ marginTop: '12px' }}>
+                  Selected Pair
                   <select
                     className="dash-trade__select"
-                    value={selectedPairIdx}
-                    onChange={e => setSelectedPairIdx(Number(e.target.value))}
-                    disabled={!isAgentActive || tradeStatus === 'trading'}
+                    value={selectedPair}
+                    onChange={event => setSelectedPair(event.target.value)}
+                    disabled={filteredPairs.length === 0}
                   >
-                    {TRADE_PAIRS.map((p, i) => (
-                      <option key={p.label} value={i}>{p.label}</option>
+                    {filteredPairs.length === 0 && <option value="">No pair found</option>}
+                    {filteredPairs.map(item => (
+                      <option key={item.pair} value={item.pair}>{item.pair}</option>
                     ))}
                   </select>
                 </label>
-
-                <label className="dash-trade__label">
-                  Amount
-                  <div className="dash-trade__input-wrap">
-                    <input
-                      type="text"
-                      className="dash-trade__input"
-                      value={tradeAmount}
-                      onChange={e => setTradeAmount(e.target.value)}
-                      disabled={!isAgentActive || tradeStatus === 'trading'}
-                    />
-                    <span className="dash-trade__suffix">{TRADE_PAIRS[selectedPairIdx].from}</span>
-                  </div>
-                </label>
-
-                <button
-                  className={`dash-trade__exec ${isAgentActive ? 'dash-trade__exec--green' : ''}`}
-                  onClick={executeTrade}
-                  disabled={!isAgentActive || tradeStatus === 'trading'}
-                  style={{ opacity: isAgentActive ? 1 : 0.4, cursor: isAgentActive ? 'pointer' : 'not-allowed' }}
-                >
-                  {tradeStatus === 'trading' ? (
-                    <>
-                      <RefreshCw size={14} className="trade-spin" style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
-                      EXECUTING...
-                    </>
-                  ) : (
-                    <>
-                      <Zap size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
-                      EXECUTE AGENT TRADE
-                    </>
-                  )}
-                </button>
-
-                <div className="dash-trade__hint">
-                  <Activity size={14} color="#3bf7d2" />
-                  Each trade impacts your credit score: +1 success / −1 failure
-                </div>
               </div>
-            </section>
-
-            {/* Last Trade Result */}
-            <section className="dash-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-              <AnimatePresence mode="wait">
-                {trades.length > 0 ? (
-                  <motion.div
-                    key={trades[0].id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.3 }}
-                    style={{ width: '100%' }}
+              <div className="dash-orders__table" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                <div className="trade-history__thead" style={{ gridTemplateColumns: '1.5fr 1fr 1fr 1fr' }}>
+                  <span>Pair</span>
+                  <span>Token In</span>
+                  <span>Token Out</span>
+                  <span>Action</span>
+                </div>
+                {filteredPairs.slice(0, 100).map(item => (
+                  <div
+                    key={item.pair}
+                    className="trade-history__row"
+                    style={{ gridTemplateColumns: '1.5fr 1fr 1fr 1fr', cursor: 'pointer' }}
                   >
-                    <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', marginBottom: '12px' }}>
-                      Last Trade Result
-                    </div>
-                    <div style={{
-                      fontSize: '1.5rem',
-                      fontWeight: 800,
-                      color: trades[0].status === 'Success' ? '#3bf7d2' : '#ff4d6d',
-                      marginBottom: '4px',
-                    }}>
-                      {trades[0].status === 'Success' ? (
-                        <><TrendingUp size={20} style={{ display: 'inline', verticalAlign: '-3px', marginRight: '6px' }} />SUCCESS</>
-                      ) : (
-                        <><TrendingDown size={20} style={{ display: 'inline', verticalAlign: '-3px', marginRight: '6px' }} />FAILED</>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.6)', marginBottom: '12px' }}>
-                      {trades[0].pair} · {trades[0].amount}
-                    </div>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                      <div className={`trade-impact-badge ${trades[0].creditImpact > 0 ? 'trade-impact-badge--positive' : 'trade-impact-badge--negative'}`}>
-                        {trades[0].creditImpact > 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-                        CREDIT {trades[0].creditImpact > 0 ? '+1' : '−1'}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        TX: {trades[0].txHash}
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <div style={{ opacity: 0.3 }}>
-                    <ArrowRightLeft size={32} style={{ marginBottom: '12px' }} />
-                    <p style={{ fontSize: '0.75rem' }}>Execute a trade to see<br />on-chain scoring impact</p>
+                    <span className="dash-orders__pair">{item.pair}</span>
+                    <span>{item.tokenIn.symbol}</span>
+                    <span>{item.tokenOut.symbol}</span>
+                    <button className="dash-orders__tab" onClick={() => setSelectedPair(item.pair)}>Use</button>
                   </div>
-                )}
-              </AnimatePresence>
-            </section>
-          </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
-          {/* ── Panel 3: Trade History ── */}
-          <motion.section
-            className="dash-card dash-orders"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
+          <section className="dash-card" style={{ marginBottom: '16px' }}>
+            <div className="dash-card__header">
+              <h3 className="dash-card__title">Execution</h3>
+              <div className="dash-orders__tabs">
+                <button className={`dash-orders__tab ${executionMode === 'manual' ? 'active' : ''}`} onClick={() => setExecutionMode('manual')}>Manual</button>
+                <button className={`dash-orders__tab ${executionMode === 'agent' ? 'active' : ''}`} onClick={() => setExecutionMode('agent')}>Agent</button>
+              </div>
+            </div>
+
+            <div className="dash-trade__form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <label className="dash-trade__label">
+                Side
+                <select className="dash-trade__select" value={tradeSide} onChange={event => setTradeSide(event.target.value as TradeSide)}>
+                  <option value="BUY">BUY</option>
+                  <option value="SELL">SELL</option>
+                  <option value="LONG">LONG</option>
+                  <option value="SHORT">SHORT</option>
+                  <option value="DEPOSIT">DEPOSIT</option>
+                </select>
+              </label>
+
+              <label className="dash-trade__label">
+                Amount ({selectedPairMeta?.tokenIn.symbol ?? 'Token In'})
+                <input
+                  className="dash-trade__input"
+                  value={tradeAmount}
+                  onChange={event => setTradeAmount(event.target.value)}
+                  placeholder="1"
+                />
+              </label>
+
+              {executionMode === 'manual' ? (
+                <>
+                  <label className="dash-trade__label">
+                      
+                    <input className="dash-trade__input" value={connectedWallet ?? ''} readOnly placeholder="Connect wallet" />
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'end', gap: '8px' }}>
+                    <button className="dash-trade__exec" onClick={connectWallet} disabled={submittingManual}>Connect Wallet</button>
+                    <button className="dash-trade__exec dash-trade__exec--green" onClick={() => void executeManualTrade()} disabled={submittingManual}>
+                      {submittingManual ? 'Submitting...' : 'Execute Manual Trade'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label className="dash-trade__label">
+                    Agent Wallet
+                    <input
+                      className="dash-trade__input"
+                      value={agentWallet}
+                      onChange={event => setAgentWallet(event.target.value)}
+                      placeholder="0x..."
+                    />
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'end', gap: '8px' }}>
+                    <button className="dash-trade__exec dash-trade__exec--green" onClick={() => void executeAgentTrade()} disabled={submittingAgent}>
+                      {submittingAgent ? 'Submitting...' : 'Execute Agent Trade'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            {manualStatus && executionMode === 'manual' && <div className="dash-trade__hint" style={{ color: '#3bf7d2' }}>{manualStatus}</div>}
+            {agentStatus && executionMode === 'agent' && <div className="dash-trade__hint" style={{ color: '#3bf7d2' }}>{agentStatus}</div>}
+            {error && <div className="dash-trade__hint" style={{ color: '#ff4d6d' }}>{error}</div>}
+          </section>
+
+          <section className="dash-card dash-orders">
             <div className="dash-orders__header">
               <div className="dash-orders__tabs">
-                <button className="dash-orders__tab active">Trade History</button>
-                <button className="dash-orders__tab">Agent Logs</button>
+                <button className={`dash-orders__tab ${historyScope === 'wallet' ? 'active' : ''}`} onClick={() => setHistoryScope('wallet')}>Wallet History</button>
+                <button className={`dash-orders__tab ${historyScope === 'agent' ? 'active' : ''}`} onClick={() => setHistoryScope('agent')}>Agent History</button>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span className="trade-stats-pill trade-stats-pill--green">
-                  <CheckCircle2 size={10} /> {successCount} Won
-                </span>
-                <span className="trade-stats-pill trade-stats-pill--red">
-                  <XCircle size={10} /> {failCount} Lost
-                </span>
-                <span className="dash-orders__count">{trades.length} trades</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="trade-stats-pill trade-stats-pill--green">{successCount} success</span>
+                <span className="trade-stats-pill trade-stats-pill--red">{failedCount} failed</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 140px 130px auto', gap: '8px', marginBottom: '10px' }}>
+              <label className="dash-trade__label">
+                Status
+                <select className="dash-trade__select" value={statusFilter} onChange={event => setStatusFilter(event.target.value as StatusFilter)}>
+                  <option value="ALL">All</option>
+                  <option value="SUCCESS">Success</option>
+                  <option value="FAILED">Failed</option>
+                </select>
+              </label>
+              <label className="dash-trade__label">
+                Page Size
+                <select className="dash-trade__select" value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </label>
+              <div style={{ display: 'flex', alignItems: 'end', gap: '8px' }}>
+                <button className="dash-orders__tab" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={page <= 1}>Prev</button>
+                <button className="dash-orders__tab" onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={page >= totalPages}>Next</button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'flex-end', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>
+                {`Page ${page} of ${totalPages} · ${totalHistory} total trades`}
               </div>
             </div>
 
             <div className="dash-orders__table">
-              <div className="trade-history__thead">
-                <span>#</span>
+              <div className="trade-history__thead" style={{ gridTemplateColumns: '60px 1fr 90px 100px 90px 140px 100px' }}>
+                <span>ID</span>
                 <span>Pair</span>
                 <span>Side</span>
                 <span>Amount</span>
-                <span>Price</span>
-                <span>P&L</span>
-                <span>Credit</span>
                 <span>Status</span>
-                <span>Time</span>
+                <span>Tx Hash</span>
+                <span>When</span>
               </div>
 
-              {trades.length === 0 && (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '0.8125rem' }}>
-                  No trades yet. Activate agent and execute your first trade.
+              {history.map(item => (
+                <div key={item.id} className="trade-history__row" style={{ gridTemplateColumns: '60px 1fr 90px 100px 90px 140px 100px' }}>
+                  <span>{item.id}</span>
+                  <span className="dash-orders__pair">{item.pair}</span>
+                  <span>{sideLabel(item.side)}</span>
+                  <span>{item.amount}</span>
+                  <span style={{ color: item.status === 'SUCCESS' ? '#3bf7d2' : '#ff4d6d' }}>{item.status}</span>
+                  <span style={{ fontFamily: 'monospace' }}>{item.txHash ? `${item.txHash.slice(0, 10)}...` : 'N/A'}</span>
+                  <span>{formatRelativeTime(item.executedAt)}</span>
+                </div>
+              ))}
+
+              {!loadingHistory && history.length === 0 && (
+                <div style={{ padding: '20px', color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+                  No trades match current filters.
                 </div>
               )}
-
-              <AnimatePresence>
-                {trades.map((t, i) => (
-                  <motion.div
-                    key={t.id}
-                    className={`trade-history__row ${t.status === 'Success' ? 'trade-history__row--success' : 'trade-history__row--fail'}`}
-                    initial={{ opacity: 0, x: -20, height: 0 }}
-                    animate={{ opacity: 1, x: 0, height: 'auto' }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.6875rem' }}>{trades.length - i}</span>
-                    <span className="dash-orders__pair">{t.pair}</span>
-                    <span style={{ color: t.side === 'Buy' ? '#3bf7d2' : '#ff4d6d', fontWeight: 600 }}>{t.side}</span>
-                    <span>{t.amount}</span>
-                    <span>{t.price}</span>
-                    <span style={{ color: t.pnlValue >= 0 ? '#3bf7d2' : '#ff4d6d', fontWeight: 600 }}>{t.pnl}</span>
-                    <span className={`trade-credit-chip ${t.creditImpact > 0 ? 'trade-credit-chip--up' : 'trade-credit-chip--down'}`}>
-                      {t.creditImpact > 0 ? '+1' : '−1'}
-                    </span>
-                    <span className={t.status === 'Success' ? 'dash-orders__status' : ''} style={t.status === 'Failed' ? { color: '#ff4d6d', fontWeight: 600 } : {}}>
-                      {t.status}
-                    </span>
-                    <span className="dash-orders__time">{t.time}</span>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
             </div>
-
-            {/* Running Score */}
-            {trades.length > 0 && (
-              <div className="trade-running-score">
-                <span>Running Credit Score:</span>
-                <span style={{ color: '#bced62', fontWeight: 800, fontSize: '1rem' }}>{creditScore}</span>
-              </div>
-            )}
-          </motion.section>
+          </section>
         </div>
 
-        {/* ═══════════════════════════════════════════════
-            RIGHT SIDEBAR
-           ═══════════════════════════════════════════════ */}
-        <motion.aside
-          className="dash-sidebar"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          {/* ── Ingest Button ── */}
-          {!isAgentActive && (
-            <button
-              className="trade-ingest-btn"
-              onClick={ingestSkills}
-              disabled={isIngesting}
-              style={{ opacity: isIngesting ? 0.6 : 1 }}
-            >
-              <Zap size={18} fill={isIngesting ? 'transparent' : 'currentColor'} />
-              {isIngesting ? 'INGESTING SKILLS...' : 'INGEST AGENT SKILLS'}
-            </button>
-          )}
-
-          {/* ── Credit Score ── */}
+        <aside className="dash-sidebar">
           <section className="dash-card">
             <div className="dash-card__header">
-              <h3 className="dash-card__title">Credit Score</h3>
-              <div className="dash-credit__badge">
-                <ShieldCheck size={12} /> {creditScore >= REWARD_THRESHOLD ? 'UNLOCKED' : 'BUILDING'}
-              </div>
+              <h3 className="dash-card__title">Score</h3>
             </div>
-
-            {/* Gauge */}
-            <div className="dash-gauge" style={{ height: '130px' }}>
-              <svg width="170" height="96" viewBox="0 0 170 96">
-                <path
-                  d="M 15 88 A 70 70 0 0 1 155 88"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.06)"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                />
-                <motion.path
-                  d="M 15 88 A 70 70 0 0 1 155 88"
-                  fill="none"
-                  stroke={creditScore >= REWARD_THRESHOLD ? '#bced62' : creditScore > 5 ? '#3bf7d2' : '#ffb066'}
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray={219.9}
-                  initial={{ strokeDashoffset: 219.9 }}
-                  animate={{ strokeDashoffset: 219.9 - (219.9 * Math.min(creditScore / (REWARD_THRESHOLD + 5), 1)) }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                />
-              </svg>
-              <div className="dash-gauge__value" style={{ bottom: '4px' }}>
-                <motion.span
-                  key={creditScore}
-                  initial={{ scale: 1.3, color: '#fff' }}
-                  animate={{ scale: 1, color: creditScore >= REWARD_THRESHOLD ? '#bced62' : '#3bf7d2' }}
-                  transition={{ duration: 0.4 }}
-                  style={{ fontSize: '2.25rem', fontWeight: 900, lineHeight: 1 }}
-                >
-                  {creditScore}
-                </motion.span>
-                <span className="dash-gauge__label" style={{ color: creditScore >= REWARD_THRESHOLD ? '#bced62' : 'rgba(255,255,255,0.5)' }}>
-                  / {REWARD_THRESHOLD}
-                </span>
+            <div style={{ display: 'grid', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Current Score</span><strong>{score?.score ?? 0}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Successful Trades</span><strong>{score?.successfulTrades ?? 0}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Failed Trades</span><strong>{score?.failedTrades ?? 0}</strong></div>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.55)' }}>
+                Score refreshes from wallet history endpoint after each trade action.
               </div>
-            </div>
-
-            {/* Reward Progress */}
-            <div className="trade-reward-section">
-              <div className="trade-reward__header">
-                {rewardUnlocked ? <Unlock size={14} color="#bced62" /> : <Lock size={14} color="rgba(255,255,255,0.4)" />}
-                <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: rewardUnlocked ? '#bced62' : 'rgba(255,255,255,0.5)' }}>
-                  ${CREDIT_LINE_AMOUNT} Credit Line
-                </span>
-              </div>
-
-              <div className="trade-reward__track">
-                <motion.div
-                  className="trade-reward__fill"
-                  animate={{ width: `${progressPct}%` }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
-                  style={{ background: rewardUnlocked ? 'linear-gradient(90deg, #3bf7d2, #bced62)' : 'linear-gradient(90deg, #3bf7d2, rgba(59,247,210,0.4))' }}
-                />
-              </div>
-
-              <AnimatePresence mode="wait">
-                {rewardUnlocked ? (
-                  <motion.div
-                    key="unlocked"
-                    className={`trade-reward__card ${showCelebration ? 'trade-reward__card--celebrate' : ''}`}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    <Trophy size={20} color="#bced62" />
-                    <div>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#bced62' }}>Credit Line Unlocked!</div>
-                      <div style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.5)' }}>${CREDIT_LINE_AMOUNT} available</div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="locked"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.35)', marginTop: '8px', textAlign: 'center' }}
-                  >
-                    {tradesUntilUnlock > 0
-                      ? `${tradesUntilUnlock} more credit points to unlock`
-                      : 'Almost there...'}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Credit Factors */}
-            <div className="dash-credit__factors" style={{ marginTop: '16px' }}>
-              {[
-                { icon: <Fingerprint size={12} />, label: 'Identity (KYC/KYB/KYA)', value: isAgentActive ? 'Verified' : 'Pending', active: isAgentActive },
-                { icon: <Scale size={12} />, label: 'Reputation (R/R Scoring)', value: isAgentActive ? `${creditScore} pts` : '—', active: creditScore > 0 },
-                { icon: <Shield size={12} />, label: 'Compliance (AMLBOT)', value: isAgentActive ? 'Passed' : 'Pending', active: isAgentActive },
-                { icon: <Key size={12} />, label: 'Access (Credit Line)', value: rewardUnlocked ? 'Unlocked' : 'Locked', active: rewardUnlocked },
-              ].map((f, i) => (
-                <div key={i} className="trade-factor-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: f.active ? '#3bf7d2' : 'rgba(255,255,255,0.3)' }}>{f.icon}</span>
-                    <span style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.6)' }}>{f.label}</span>
-                  </div>
-                  <span style={{
-                    fontSize: '0.625rem',
-                    fontWeight: 700,
-                    color: f.active ? '#3bf7d2' : 'rgba(255,255,255,0.3)',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    background: f.active ? 'rgba(59,247,210,0.08)' : 'rgba(255,255,255,0.03)',
-                  }}>
-                    {f.value}
-                  </span>
-                </div>
-              ))}
             </div>
           </section>
 
-          {/* ── Wallet ── */}
           <section className="dash-card">
-            <div className="dash-card__header">
-              <h3 className="dash-card__title">Onchain OS Wallet</h3>
-              <Wallet size={14} color="var(--bondcredit-s2)" />
-            </div>
-            <div style={{ marginTop: '8px' }}>
-              <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '4px' }}>Agentic Wallet</div>
-              <div style={{ fontSize: '0.8125rem', fontFamily: 'monospace', color: '#bced62', marginBottom: '16px' }}>0x7b2F...c9f29E</div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {[
-                  { symbol: 'ETH', balance: walletBalances.ETH },
-                  { symbol: 'USDC', balance: walletBalances.USDC },
-                  { symbol: 'XLYR', balance: walletBalances.XLYR },
-                ].map(token => (
-                  <div key={token.symbol} className="trade-wallet-token">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div className="trade-wallet-token__icon">{token.symbol.charAt(0)}</div>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{token.symbol}</span>
-                    </div>
-                    <motion.span
-                      key={token.balance}
-                      initial={{ color: '#fff' }}
-                      animate={{ color: 'rgba(255,255,255,0.9)' }}
-                      style={{ fontSize: '0.75rem', fontWeight: 700 }}
-                    >
-                      {typeof token.balance === 'number' ? token.balance.toLocaleString('en-US', { maximumFractionDigits: 2 }) : token.balance}
-                    </motion.span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Agent Capabilities */}
-            <div className="trade-capabilities">
-              {['Swap', 'Price Data', 'x402 Payments', 'DEX Trade'].map(cap => (
-                <div key={cap} className="trade-capability">
-                  <CheckCircle2 size={10} color="#3bf7d2" />
-                  <span>{cap}</span>
-                </div>
-              ))}
+            <h3 className="dash-card__title" style={{ marginBottom: '10px' }}>Execution Notes</h3>
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.62)', display: 'grid', gap: '8px' }}>
+              <div>Manual flow: quote -&gt; build tx -&gt; wallet sign -&gt; store transaction.</div>
+              <div>Agent flow: backend execute-trade route with enrolled agent wallet.</div>
+              <div>History supports status filter, page size, and pagination.</div>
             </div>
           </section>
-
-          {/* ── Quick Stats ── */}
-          <section className="dash-card">
-            <h3 className="dash-card__title" style={{ marginBottom: '12px' }}>Session Stats</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                { label: 'Total Trades', value: trades.length.toString() },
-                { label: 'Win Rate', value: trades.length > 0 ? `${Math.round((successCount / trades.length) * 100)}%` : '—' },
-                { label: 'Credit Score', value: creditScore.toString() },
-                { label: 'Reward Status', value: rewardUnlocked ? '✅ Unlocked' : '🔒 Locked' },
-              ].map((stat, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.5)' }}>{stat.label}</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--bondcredit-white)' }}>{stat.value}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </motion.aside>
+        </aside>
       </div>
     </main>
   );
